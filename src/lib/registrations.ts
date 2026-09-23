@@ -69,7 +69,7 @@ export async function updateRecord(
 }
 
 export async function addRegistration(
-  input: RegistrationInput & { passwordHash: string },
+  input: RegistrationInput & { passwordHash?: string },
 ): Promise<RegistrationRecord> {
   const records = await readAll();
   const record: RegistrationRecord = {

@@ -207,6 +207,12 @@ export const teamAddPlayerSchema = z.object({
 });
 export type TeamAddPlayerInput = z.infer<typeof teamAddPlayerSchema>;
 
+export const newTeamPlayerSchema = z.object({
+  name: z.string().trim().min(2, "Player name is too short").max(60, "Player name is too long"),
+  mobile: mobileField,
+});
+export type NewTeamPlayerInput = z.infer<typeof newTeamPlayerSchema>;
+
 export const addParticipantsSchema = z.object({
   playerIds: z
     .array(z.string().min(1))
@@ -237,6 +243,8 @@ export const matchCreateSchema = z
     date: z.string().min(1, "Pick a date"),
     tossWinnerId: z.string().min(1, "Select the toss winner"),
     tossDecision: z.enum(["bat", "bowl"], { error: "Choose bat or bowl" }),
+    teamAPlayerIds: z.array(z.string().min(1)).min(2, "Select at least two Team A players"),
+    teamBPlayerIds: z.array(z.string().min(1)).min(2, "Select at least two Team B players"),
   })
   .refine((d) => d.teamAId !== d.teamBId, {
     error: "Pick two different teams",

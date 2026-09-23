@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTeam, addPlayerToTeam, canManageTeamForUser } from "@/lib/teams";
-import { teamAddPlayerSchema } from "@/lib/validation";
-import { findById } from "@/lib/registrations";
+import { newTeamPlayerSchema, teamAddPlayerSchema } from "@/lib/validation";
+import { addRegistration, findById, isMobileRegistered } from "@/lib/registrations";
 
 export const runtime = "nodejs";
 
@@ -36,15 +36,43 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const parsed = teamAddPlayerSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Select a player." },
-      { status: 422 },
-    );
+  const raw = body as { playerId?: unknown; playerNumber?: unknown; newPlayer?: unknown };
+  let playerId: string;
+  let playerName: string;
+  let playerNumber = typeof raw.playerNumber === "string" ? raw.playerNumber : "1";
+
+  if (raw.newPlayer !== undefined) {
+    const newPlayer = newTeamPlayerSchema.safeParse(raw.newPlayer);
+    if (!newPlayer.success) {
+      return NextResponse.json({ error: newPlayer.error.issues[0]?.message ?? "Enter valid player details." }, { status: 422 });
+    }
+    if (await isMobileRegistered(newPlayer.data.mobile)) {
+      return NextResponse.json({ error: "A player with this mobile number already exists. Search and select them instead." }, { status: 409 });
+    }
+    const created = await addRegistration({
+      name: newPlayer.data.name,
+      mobile: newPlayer.data.mobile,
+      gender: "Other",
+      age: 18,
+      playerType: "All-Rounder",
+    });
+    playerId = created.id;
+    playerName = created.name;
+  } else {
+    const parsed = teamAddPlayerSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Select a player." }, { status: 422 });
+    }
+    playerId = parsed.data.playerId;
+    playerNumber = parsed.data.playerNumber;
+    const player = await findById(playerId);
+    if (!player) {
+      return NextResponse.json({ error: "That CricArena player was not found." }, { status: 422 });
+    }
+    playerName = player.name;
   }
 
-  const player = await findById(parsed.data.playerId);
+  const player = await findById(playerId);
   if (!player) {
     return NextResponse.json(
       { error: "That CricArena player was not found." },
@@ -53,9 +81,9 @@ export async function POST(
   }
 
   const result = await addPlayerToTeam(teamId, {
-    playerId: player.id,
-    name: player.name,
-    playerNumber: parsed.data.playerNumber,
+    playerId,
+    name: playerName,
+    playerNumber,
   });
   if (result === "not-found") {
     return NextResponse.json({ error: "Team not found." }, { status: 404 });

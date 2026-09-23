@@ -3,8 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getTournament } from "@/lib/tournaments";
 import { listTeamsForTournament } from "@/lib/teams";
+import { listPlayers } from "@/lib/registrations";
 import { DashboardShell } from "@/components/DashboardShell";
-import { CreateMatchForm } from "@/components/CreateMatchForm";
+import { MatchSetupWizard } from "@/components/MatchSetupWizard";
 
 export default async function NewMatchPage({
   params,
@@ -22,6 +23,11 @@ export default async function NewMatchPage({
   }
 
   const teams = await listTeamsForTournament(id);
+  const players = (await listPlayers()).map((player) => ({
+    id: player.id,
+    name: player.name,
+    mobile: player.mobile,
+  }));
 
   return (
     <DashboardShell userName={user.name}>
@@ -46,9 +52,10 @@ export default async function NewMatchPage({
           </Link>
         </p>
       ) : (
-        <CreateMatchForm
+        <MatchSetupWizard
           tournamentId={id}
-          teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+          initialTeams={teams}
+          availablePlayers={players}
         />
       )}
     </DashboardShell>

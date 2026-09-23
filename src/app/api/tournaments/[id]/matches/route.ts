@@ -18,6 +18,16 @@ function toRef(team: Team) {
   };
 }
 
+function selectedRef(team: Team, playerIds: string[]) {
+  const selected = new Set(playerIds);
+  return {
+    ...toRef(team),
+    players: team.players
+      .filter((player) => selected.has(player.playerId))
+      .map((p) => ({ playerId: p.playerId, name: p.name })),
+  };
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -85,6 +95,19 @@ export async function POST(
     );
   }
   if (
+    parsed.data.teamAPlayerIds.some(
+      (playerId) => !teamA.players.some((player) => player.playerId === playerId),
+    ) ||
+    parsed.data.teamBPlayerIds.some(
+      (playerId) => !teamB.players.some((player) => player.playerId === playerId),
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Selected players must belong to their respective teams." },
+      { status: 422 },
+    );
+  }
+  if (
     parsed.data.tossWinnerId !== teamA.id &&
     parsed.data.tossWinnerId !== teamB.id
   ) {
@@ -97,8 +120,8 @@ export async function POST(
   const match = await createLiveMatch({
     tournamentId: id,
     ownerId: user.id,
-    teamA: toRef(teamA),
-    teamB: toRef(teamB),
+    teamA: selectedRef(teamA, parsed.data.teamAPlayerIds),
+    teamB: selectedRef(teamB, parsed.data.teamBPlayerIds),
     overs: parsed.data.overs,
     venue: parsed.data.venue,
     date: parsed.data.date,

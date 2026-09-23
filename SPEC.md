@@ -234,13 +234,20 @@ Route: `/tournaments/[id]/matches/new`
 
 The existing form supports:
 
-- Team A and Team B.
+- Two team slots: Team A and Team B.
+- Search and select existing tournament teams.
+- Add a new team from the team picker.
+- Search and select players from the selected team's squad.
+- Add a registered player to the selected team.
+- Add an unregistered player inline with their name and mobile number; the player is created as a passwordless account and added to the squad without replacing the current session.
+- Choose captain, vice-captain, and wicketkeeper for each selected squad.
+- Return to the team selection screen to choose Team B after completing Team A.
 - Overs per side.
 - Match date.
 - Venue.
 - Toss winner.
 - Toss decision: bat or bowl.
-- Virtual coin flip helper.
+- Virtual coin toss: the toss stays disabled until both teams have at least two players. The user then selects which team calls the toss, that team chooses Heads or Tails, the other team receives the opposite side, and clicking the coin runs an in-air animation before revealing the random result.
 
 The form posts to `POST /api/tournaments/[id]/matches` and redirects to `/matches/[matchId]`.
 
