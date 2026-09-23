@@ -45,7 +45,7 @@ function MobileField({
   );
 }
 
-export function LoginForm({ redirectTo = "/tournaments" }: { redirectTo?: string }) {
+export function LoginForm({ redirectTo = "/matches" }: { redirectTo?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "reset">("login");
   const [mobile, setMobile] = useState("");
@@ -120,7 +120,7 @@ export function LoginForm({ redirectTo = "/tournaments" }: { redirectTo?: string
         setError("Guest access is temporarily unavailable.");
         return;
       }
-      router.push(redirectTo);
+      router.push("/matches");
       router.refresh();
     } catch {
       setError("Network error. Please try again.");

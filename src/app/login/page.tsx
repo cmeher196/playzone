@@ -6,7 +6,9 @@ import { LoginForm } from "@/components/LoginForm";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 function inviteDestination(value: string | undefined): string {
-  return value?.startsWith("/join/") ? value : "/tournaments";
+  return value && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/matches";
 }
 
 export default async function LoginPage({
@@ -53,7 +55,7 @@ export default async function LoginPage({
         <p className="mt-6 text-center text-sm text-white/50">
           New player?{" "}
           <Link
-            href={`/register${redirectTo === "/tournaments" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
+            href={`/register${redirectTo === "/matches" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
             className="font-medium text-emerald-300 transition hover:text-emerald-200"
           >
             Register here

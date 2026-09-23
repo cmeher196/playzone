@@ -4,7 +4,9 @@ import { LoginForm } from "@/components/LoginForm";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 function inviteDestination(value: string | undefined): string {
-  return value?.startsWith("/join/") ? value : "/tournaments";
+  return value && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/matches";
 }
 
 export default async function Home({
@@ -27,7 +29,7 @@ export default async function Home({
         <nav className="mb-4 flex items-center justify-end gap-2">
           <ThemeSwitcher align="right" className="w-40" />
           <Link
-            href={`/register${redirectTo === "/tournaments" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
+            href={`/register${redirectTo === "/matches" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
             className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur transition hover:bg-white/10"
           >
             Register

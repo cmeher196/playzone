@@ -102,10 +102,12 @@ export function canManageLiveMatch(
   user: { id: string; isAdmin: boolean },
   tournamentOrganizerId?: string,
 ): boolean {
+  // New matches are controlled by their creator. Legacy matches without an
+  // owner remain manageable by the tournament organizer.
   return (
     user.isAdmin ||
     match.ownerId === user.id ||
-    (!!tournamentOrganizerId && tournamentOrganizerId === user.id)
+    (!match.ownerId && !!tournamentOrganizerId && tournamentOrganizerId === user.id)
   );
 }
 

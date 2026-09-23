@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { getTournament, canManageTournament } from "@/lib/tournaments";
-import { getLiveMatch } from "@/lib/live-matches";
+import { getTournament } from "@/lib/tournaments";
+import { canManageLiveMatch, getLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 import { DashboardShell } from "@/components/DashboardShell";
 import { Scorer } from "@/components/Scorer";
@@ -24,10 +24,10 @@ export default async function MatchPage({
 
   const live = computeMatch(match);
   const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
-  const canScore = match.ownerId === user.id || canManageTournament(tournament ?? { organizerId: "" }, {
+  const canScore = canManageLiveMatch(match, {
     id: user.id,
     isAdmin: isAdmin(user),
-  });
+  }, tournament?.organizerId);
   const data = { match, live };
 
   return (

@@ -42,6 +42,7 @@ export function DashboardShell({
     pathname === "/badminton" ||
     pathname.startsWith("/badminton/") ||
     (pathname === "/chats" && searchParams.get("sport") === "badminton");
+  const guest = userName === "Guest";
   const nav = badminton ? BADMINTON_NAV : CRICKET_NAV;
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -76,7 +77,10 @@ export function DashboardShell({
             <select
               value={badminton ? "badminton" : "cricket"}
               onChange={(event) => {
-                window.location.href = event.target.value === "badminton" ? "/badminton" : "/tournaments";
+                const destination = event.target.value === "badminton" ? "/badminton" : "/tournaments";
+                window.location.href = guest
+                  ? `/?next=${encodeURIComponent(destination)}`
+                  : destination;
               }}
               className="w-full rounded-xl border border-white/10 bg-[var(--surface-solid)] px-3 py-2.5 text-sm font-semibold text-white outline-none transition focus:border-emerald-400/60"
             >
@@ -91,12 +95,13 @@ export function DashboardShell({
                 item.href === "/chats"
                   ? `/chats?sport=${badminton ? "badminton" : "cricket"}`
                   : item.href;
+              const loginHref = `/?next=${encodeURIComponent(href)}`;
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
-                  href={href}
+                  href={guest ? loginHref : href}
                   className={`flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
                     active
                       ? "bg-emerald-400/15 text-emerald-200"

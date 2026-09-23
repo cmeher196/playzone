@@ -32,7 +32,7 @@ The application is implemented as a Next.js App Router application with React an
 
 ### 3.1 Guest
 
-Guests receive a signed session cookie with a synthetic guest identity. A guest can browse, but must register before creating or organizing content.
+Guests receive a signed session cookie with a synthetic guest identity. After guest entry, the guest lands directly on `/matches` and can browse the match list and match details.
 
 Current guest capabilities:
 
@@ -44,6 +44,8 @@ Guest restrictions:
 
 - Cannot create standalone matches.
 - Cannot create tournaments or tournament-backed matches.
+- Clicking any dashboard navigation item or changing sport sends the guest to the login landing page and preserves the requested destination.
+- Choosing `Continue as guest` from that login landing page always returns to `/matches`; it never grants guest access to the requested protected destination.
 - Guest write permissions should be reviewed for every future write endpoint. The session exists for exploration, but it is not a registered player account.
 
 ### 3.2 Player
@@ -218,13 +220,13 @@ Most authenticated pages use `DashboardShell`, which provides:
 
 The cricket sidebar contains a `Matches` entry at `/matches`.
 
-The Matches page groups visible matches into:
+The Matches page shows all created matches to authenticated users and groups them into:
 
 - **Live now:** matches with `status: "live"`.
-- **Upcoming:** matches with `status: "scheduled"`.
-- **Completed:** matches with `status: "completed"`.
+- **Upcoming:** matches with `status: "scheduled"`, displayed with an `Upcoming` badge.
+- **Past:** matches with `status: "completed"`, displayed with a `Past` badge.
 
-Administrators see all live-scored cricket matches. Other users see matches where they participate, own, or organize the related tournament.
+Every authenticated user can view the full match list. The match creator or an administrator can open scorer mode; other users receive the live scoreboard and match details in view-only mode.
 
 ### 7.2 Tournament-Backed Match Creation
 
