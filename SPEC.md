@@ -32,7 +32,7 @@ The application is implemented as a Next.js App Router application with React an
 
 ### 3.1 Guest
 
-Guests receive a signed session cookie with a synthetic guest identity.
+Guests receive a signed session cookie with a synthetic guest identity. A guest can browse, but must register before creating or organizing content.
 
 Current guest capabilities:
 
@@ -43,6 +43,7 @@ Current guest capabilities:
 Guest restrictions:
 
 - Cannot create standalone matches.
+- Cannot create tournaments or tournament-backed matches.
 - Guest write permissions should be reviewed for every future write endpoint. The session exists for exploration, but it is not a registered player account.
 
 ### 3.2 Player
@@ -60,7 +61,7 @@ Player capabilities include:
 
 ### 3.3 Tournament Organizer
 
-Any registered player can create a tournament. The tournament organizer can:
+Any registered player can create a tournament. The user who creates a tournament is its organizer. Any registered player can also create a match, including a match inside an existing tournament; the creating user becomes the match owner. Other users can view existing tournaments and matches, but cannot modify them. The organizer/owner can:
 
 - Edit or delete the tournament according to the existing route authorization.
 - Manage tournament participants.
@@ -108,14 +109,13 @@ Registration collects:
 
 - Name.
 - Mobile number.
-- OTP verification.
 - Gender.
 - Age.
 - Playing role.
 - Password.
 - Payment and UTR fields where applicable to the existing registration flow.
 
-The password is stored as an scrypt hash. A successful registration creates a session immediately.
+The password is stored as an scrypt hash. Registration does not require OTP verification. A successful registration creates a session immediately.
 
 ### 4.3 Guest Login
 

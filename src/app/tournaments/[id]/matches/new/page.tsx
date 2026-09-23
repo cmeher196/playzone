@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
-import { getTournament, canManageTournament } from "@/lib/tournaments";
+import { getTournament } from "@/lib/tournaments";
 import { listTeamsForTournament } from "@/lib/teams";
 import { DashboardShell } from "@/components/DashboardShell";
 import { CreateMatchForm } from "@/components/CreateMatchForm";
@@ -18,14 +17,14 @@ export default async function NewMatchPage({
   const { id } = await params;
   const tournament = await getTournament(id);
   if (!tournament) notFound();
-  if (!canManageTournament(tournament, { id: user.id, isAdmin: isAdmin(user) })) {
-    redirect(`/tournaments/${id}`);
+  if (user.role === "guest") {
+    redirect("/register");
   }
 
   const teams = await listTeamsForTournament(id);
 
   return (
-    <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>
+    <DashboardShell userName={user.name}>
       <div className="mb-5">
         <Link
           href={`/tournaments/${id}`}

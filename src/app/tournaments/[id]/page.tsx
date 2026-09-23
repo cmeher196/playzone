@@ -239,7 +239,7 @@ export default async function TournamentDetailPage({
           <h2 className="text-lg font-semibold text-white">
             Live &amp; upcoming matches
           </h2>
-          {canManage && teams.length >= 2 && (
+          {user.role !== "guest" && teams.length >= 2 && (
             <Link
               href={`/tournaments/${tournament.id}/matches/new`}
               className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:from-emerald-400 hover:to-emerald-300"
@@ -250,11 +250,9 @@ export default async function TournamentDetailPage({
         </div>
         {liveMatches.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-white/50">
-            {canManage
-              ? teams.length < 2
-                ? "Create at least two teams to start a match."
-                : "No live matches. Create one to start ball-by-ball scoring."
-              : "No live matches right now."}
+            {teams.length < 2
+              ? "Create at least two teams to start a match."
+              : "No live matches. Create one to start ball-by-ball scoring."}
           </p>
         ) : (
           <ul className="space-y-2">

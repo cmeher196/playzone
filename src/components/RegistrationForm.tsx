@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -17,8 +17,6 @@ const PLAYER_TYPE_ICONS: Record<(typeof PLAYER_TYPES)[number], string> = {
   "All-Rounder": "⭐",
   "Wicket-Keeper": "🧤",
 };
-
-const MOBILE_RE = /^[6-9]\d{9}$/;
 
 type SubmitState =
   | { status: "idle" }
@@ -37,7 +35,6 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
     handleSubmit,
     control,
     reset,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<RegistrationFormInput>({
     resolver: zodResolver(registrationFormSchema),
@@ -45,34 +42,13 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
     defaultValues: { name: "", mobile: "", password: "" },
   });
 
-  const mobile = watch("mobile") ?? "";
-  const [verifiedToken, setVerifiedToken] = useState<string | null>(null);
-  const [verifiedMobile, setVerifiedMobile] = useState("");
-  const mobileVerified =
-    !!verifiedToken && verifiedMobile === mobile && MOBILE_RE.test(mobile);
-
-  // Editing the mobile after verifying invalidates the verification.
-  useEffect(() => {
-    if (verifiedMobile && mobile !== verifiedMobile) {
-      setVerifiedToken(null);
-      setVerifiedMobile("");
-    }
-  }, [mobile, verifiedMobile]);
-
   const onSubmit = handleSubmit(async (values) => {
-    if (!verifiedToken || verifiedMobile !== values.mobile) {
-      setSubmit({
-        status: "error",
-        message: "Please verify your mobile number with the OTP first.",
-      });
-      return;
-    }
     setSubmit({ status: "idle" });
     try {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, verificationToken: verifiedToken }),
+        body: JSON.stringify(values),
       });
       const data = (await res.json()) as { id?: string; error?: string };
       if (!res.ok) {
@@ -83,8 +59,6 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
         return;
       }
       setSubmit({ status: "success", id: data.id ?? "", name: values.name });
-      setVerifiedToken(null);
-      setVerifiedMobile("");
       reset();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
@@ -151,14 +125,6 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
           {errors.mobile && (
             <p className={errorClass}>{errors.mobile.message}</p>
           )}
-          <MobileVerification
-            mobile={mobile}
-            verified={mobileVerified}
-            onVerified={(m, token) => {
-              setVerifiedMobile(m);
-              setVerifiedToken(token);
-            }}
-          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -281,160 +247,15 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
 
       <button
         type="submit"
-        disabled={isSubmitting || !mobileVerified}
+        disabled={isSubmitting}
         className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-6 py-3.5 text-base font-semibold text-emerald-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? "Submitting…" : "Complete Registration"}
       </button>
-      {!mobileVerified && (
-        <p className="text-center text-xs text-amber-300/80">
-          Verify your mobile number to enable registration.
-        </p>
-      )}
       <p className="text-center text-xs text-white/40">
         By registering you agree to the league rules &amp; fair-play policy.
       </p>
     </form>
-  );
-}
-
-function MobileVerification({
-  mobile,
-  verified,
-  onVerified,
-}: {
-  mobile: string;
-  verified: boolean;
-  onVerified: (mobile: string, token: string) => void;
-}) {
-  const valid = MOBILE_RE.test(mobile);
-  const [phase, setPhase] = useState<"unsent" | "sent">("unsent");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [devCode, setDevCode] = useState<string | null>(null);
-  const [resendIn, setResendIn] = useState(0);
-
-  // Reset the widget whenever the target number changes.
-  useEffect(() => {
-    setPhase("unsent");
-    setCode("");
-    setDevCode(null);
-    setError(null);
-    setResendIn(0);
-  }, [mobile]);
-
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [resendIn]);
-
-  async function send() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile }),
-      });
-      const data = (await res.json()) as { devCode?: string; error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Couldn't send the code. Try again.");
-        return;
-      }
-      setPhase("sent");
-      setDevCode(data.devCode ?? null);
-      setResendIn(30);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verify() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, code }),
-      });
-      const data = (await res.json()) as { token?: string; error?: string };
-      if (!res.ok || !data.token) {
-        setError(data.error ?? "Verification failed. Try again.");
-        return;
-      }
-      onVerified(mobile, data.token);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (verified) {
-    return (
-      <div className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-300">
-        <span aria-hidden>✓</span> Mobile number verified
-      </div>
-    );
-  }
-
-  if (!valid) return null;
-
-  const smallBtn =
-    "shrink-0 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50";
-
-  return (
-    <div className="mt-2.5 space-y-2">
-      {phase === "unsent" ? (
-        <button type="button" onClick={send} disabled={busy} className={smallBtn}>
-          {busy ? "Sending…" : "Send OTP"}
-        </button>
-      ) : (
-        <>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={code}
-              onChange={(e) =>
-                setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder="6-digit code"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-base tracking-[0.3em] text-white outline-none transition placeholder:tracking-normal placeholder:text-white/30 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20"
-            />
-            <button
-              type="button"
-              onClick={verify}
-              disabled={busy || code.length !== 6}
-              className={smallBtn}
-            >
-              {busy ? "Verifying…" : "Verify"}
-            </button>
-          </div>
-          <div className="flex items-center justify-between text-xs text-white/50">
-            <button
-              type="button"
-              onClick={send}
-              disabled={busy || resendIn > 0}
-              className="font-medium text-emerald-300/80 transition hover:text-emerald-200 disabled:text-white/40"
-            >
-              {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
-            </button>
-            {devCode && (
-              <span className="text-emerald-300/70">Dev code: {devCode}</span>
-            )}
-          </div>
-        </>
-      )}
-      {error && <p className={errorClass}>{error}</p>}
-    </div>
   );
 }
 

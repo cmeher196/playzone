@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { registrationApiSchema } from "@/lib/validation";
 import { addRegistration, isMobileRegistered } from "@/lib/registrations";
-import { verifyToken } from "@/lib/otp";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -27,13 +26,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { verificationToken, password, ...data } = parsed.data;
-  if (!verifyToken(verificationToken, data.mobile)) {
-    return NextResponse.json(
-      { error: "Please verify your mobile number with the OTP first." },
-      { status: 401 },
-    );
-  }
+  const { password, ...data } = parsed.data;
 
   if (await isMobileRegistered(data.mobile)) {
     return NextResponse.json(

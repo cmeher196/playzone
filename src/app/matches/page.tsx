@@ -122,7 +122,7 @@ export default async function MyMatchesPage() {
           <span className="text-sm text-white/40">
             {mine.length} match{mine.length === 1 ? "" : "es"}
           </span>
-          {(admin || organizerOf.size > 0) && (
+          {user.role !== "guest" && (
             <Link
               href="/matches/new"
               className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-3 py-2 text-sm font-semibold text-emerald-950 transition hover:from-emerald-400 hover:to-emerald-300"

@@ -25,7 +25,7 @@ function teamRef(id: string, name: unknown, players: unknown): TeamRef | null {
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user || user.role === "guest") {
-    return NextResponse.json({ error: "Sign in with an account to create a match." }, { status: 403 });
+    return NextResponse.json({ error: "Create an account to organize a match." }, { status: 403 });
   }
 
   let body: Record<string, unknown>;

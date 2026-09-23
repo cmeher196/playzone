@@ -8,6 +8,7 @@ import { CreateTournamentForm } from "@/components/CreateTournamentForm";
 export default async function NewTournamentPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  if (user.role === "guest") redirect("/register");
 
   return (
     <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>

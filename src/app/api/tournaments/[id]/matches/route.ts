@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
-import { getTournament, canManageTournament } from "@/lib/tournaments";
+import { getTournament } from "@/lib/tournaments";
 import { getTeam, type Team } from "@/lib/teams";
 import {
   createLiveMatch,
@@ -36,6 +35,12 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
+  if (user.role === "guest") {
+    return NextResponse.json(
+      { error: "Create an account to organize a match." },
+      { status: 403 },
+    );
+  }
 
   const { id } = await params;
   const tournament = await getTournament(id);
@@ -45,13 +50,6 @@ export async function POST(
       { status: 404 },
     );
   }
-  if (!canManageTournament(tournament, { id: user.id, isAdmin: isAdmin(user) })) {
-    return NextResponse.json(
-      { error: "Only the organizer or an admin can create matches." },
-      { status: 403 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();

@@ -18,6 +18,12 @@ export async function POST(request: Request) {
       { status: 401 },
     );
   }
+  if (user.role === "guest") {
+    return NextResponse.json(
+      { error: "Create an account to organize a tournament." },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {

@@ -46,12 +46,10 @@ export const registrationFormSchema = registrationSchema.extend({
 
 export type RegistrationFormInput = z.infer<typeof registrationFormSchema>;
 
-// Payload accepted by the register API: form fields, password, and the OTP
-// token proving the mobile was verified. Password is hashed and the token
-// dropped before the record is persisted (see the register route).
+// Payload accepted by the register API: form fields and password. Password is
+// hashed before the record is persisted (see the register route).
 export const registrationApiSchema = registrationSchema.extend({
   password: passwordField,
-  verificationToken: z.string().min(1, "Please verify your mobile number"),
 });
 
 export type RegistrationApiInput = z.infer<typeof registrationApiSchema>;

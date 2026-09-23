@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { canManageTournament, listTournaments } from "@/lib/tournaments";
+import { listTournaments } from "@/lib/tournaments";
 import { listTeamsForTournament } from "@/lib/teams";
 import { DashboardShell } from "@/components/DashboardShell";
 import { CreateStandaloneMatchForm } from "@/components/CreateStandaloneMatchForm";
@@ -10,11 +10,10 @@ import { CreateStandaloneMatchForm } from "@/components/CreateStandaloneMatchFor
 export default async function NewMatchPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  if (user.role === "guest") redirect("/register");
 
   const admin = isAdmin(user);
-  const tournaments = (await listTournaments()).filter((tournament) =>
-    canManageTournament(tournament, { id: user.id, isAdmin: admin }),
-  );
+  const tournaments = await listTournaments();
   const tournamentOptions = await Promise.all(
     tournaments.map(async (tournament) => ({
       tournament,
