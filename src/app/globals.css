@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ---------------------------------------------------------------------------
+   Theming
+   The whole UI derives its "ink" from --color-white (text/surfaces/borders)
+   and its primary accent from the emerald ramp. Tailwind v4 compiles utilities
+   to var(--color-*), so overriding these variables re-skins every component.
+   <html data-theme> picks the palette; <html data-mode> flips light/dark ink.
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+  --page-bg: #050d09;
+  --page-glow: rgba(16, 185, 129, 0.12);
+  --surface-solid: #0a1712;
+}
+
+/* --- Light / dark ink + semantic accent readability ---------------------- */
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --color-white: #ffffff;
+}
+
+:root[data-mode="light"] {
+  color-scheme: light;
+  --surface-solid: #ffffff;
+  /* Dark ink: every text-white / bg-white / border-white flips to this. */
+  --color-white: #0b1a14;
+  /* Semantic accents are chosen for dark bg; darken their text shades so they
+     stay legible on a light page (fills at low opacity remain subtle tints). */
+  --color-amber-200: #b45309;
+  --color-amber-300: #b45309;
+  --color-rose-200: #be123c;
+  --color-rose-300: #e11d48;
+  --color-rose-400: #e11d48;
+  --color-sky-300: #0369a1;
+}
+
+/* --- Palettes ------------------------------------------------------------ */
+:root[data-theme="emerald"] {
+  --page-bg: #050d09;
+  --page-glow: rgba(16, 185, 129, 0.12);
+  --surface-solid: #0a1712;
+}
+
+:root[data-theme="midnight"] {
+  --page-bg: #0b1020;
+  --page-glow: rgba(99, 102, 241, 0.16);
+  --surface-solid: #10152b;
+  --color-emerald-100: #e0e7ff;
+  --color-emerald-200: #c7d2fe;
+  --color-emerald-300: #a5b4fc;
+  --color-emerald-400: #818cf8;
+  --color-emerald-500: #6366f1;
+  --color-emerald-950: #1e1b4b;
+}
+
+:root[data-theme="ocean"] {
+  --page-bg: #071a20;
+  --page-glow: rgba(34, 211, 238, 0.16);
+  --surface-solid: #0a2630;
+  --color-emerald-100: #cffafe;
+  --color-emerald-200: #a5f3fc;
+  --color-emerald-300: #67e8f9;
+  --color-emerald-400: #22d3ee;
+  --color-emerald-500: #06b6d4;
+  --color-emerald-950: #083344;
+}
+
+:root[data-theme="sunset"] {
+  --page-bg: #170f0a;
+  --page-glow: rgba(251, 146, 60, 0.16);
+  --surface-solid: #241610;
+  --color-emerald-100: #ffedd5;
+  --color-emerald-200: #fed7aa;
+  --color-emerald-300: #fdba74;
+  --color-emerald-400: #fb923c;
+  --color-emerald-500: #f97316;
+  --color-emerald-950: #431407;
+}
+
+:root[data-theme="grape"] {
+  --page-bg: #150a18;
+  --page-glow: rgba(217, 70, 239, 0.16);
+  --surface-solid: #241029;
+  --color-emerald-100: #fae8ff;
+  --color-emerald-200: #f5d0fe;
+  --color-emerald-300: #f0abfc;
+  --color-emerald-400: #e879f9;
+  --color-emerald-500: #d946ef;
+  --color-emerald-950: #4a044e;
+}
+
+:root[data-theme="light"] {
+  --page-bg: #f2f6f4;
+  --page-glow: rgba(16, 185, 129, 0.1);
+  /* Text shades (100-300) go dark for legibility; fills (400/500) stay vivid;
+     950 stays dark for text on bright buttons. */
+  --color-emerald-100: #047857;
+  --color-emerald-200: #047857;
+  --color-emerald-300: #059669;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-950: #022c22;
+}
+
+:root[data-theme="indigo-light"] {
+  --page-bg: #f3f4fb;
+  --page-glow: rgba(99, 102, 241, 0.1);
+  --color-emerald-100: #4338ca;
+  --color-emerald-200: #4338ca;
+  --color-emerald-300: #4f46e5;
+  --color-emerald-400: #818cf8;
+  --color-emerald-500: #6366f1;
+  --color-emerald-950: #1e1b4b;
+}
+
+html {
+  color-scheme: inherit;
+}
+
+body {
+  min-height: 100dvh;
+  background-color: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Native <select> dropdown options: the components hardcode a dark bg utility,
+   so drive it from the theme instead (the attribute selector out-specifies the
+   single-class utility). */
+:root[data-theme] select option {
+  background-color: var(--surface-solid);
+  color: var(--color-white);
+}
+
+/* Remove number-input spinners for a cleaner look */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}

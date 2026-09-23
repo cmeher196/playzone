@@ -1,0 +1,6 @@
+import { notFound, redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
+import { listBadmintonTournaments } from "@/lib/badminton";
+import { DashboardShell } from "@/components/DashboardShell";
+import { BadmintonScorer } from "@/components/BadmintonScorer";
+export default async function BadmintonMatchPage({ params }: { params: Promise<{ matchId: string }> }) { const user = await getSessionUser(); if (!user) redirect("/login"); const { matchId } = await params; const tournament = (await listBadmintonTournaments()).find((item) => item.matches.some((match) => match.id === matchId)); const match = tournament?.matches.find((item) => item.id === matchId); if (!tournament || !match) notFound(); return <DashboardShell userName={user.name} isAdmin={user.role === "admin"}><p className="mb-2 text-sm text-emerald-300">{tournament.name} · {match.round}</p><h1 className="mb-5 text-2xl font-bold">Live badminton match</h1><BadmintonScorer matchId={match.id} initial={match} /></DashboardShell>; }
