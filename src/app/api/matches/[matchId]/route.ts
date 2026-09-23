@@ -4,7 +4,8 @@ import { rescheduleLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { canManageTournament, getTournament } from "@/lib/tournaments";
+import { getTournament } from "@/lib/tournaments";
+import { canManageLiveMatch } from "@/lib/live-matches";
 
 export const runtime = "nodejs";
 
@@ -29,8 +30,8 @@ export async function PATCH(
   const { matchId } = await params;
   const match = await getLiveMatch(matchId);
   if (!match) return NextResponse.json({ error: "Match not found." }, { status: 404 });
-  const tournament = await getTournament(match.tournamentId);
-  if (!canManageTournament(tournament ?? { organizerId: "" }, { id: user.id, isAdmin: isAdmin(user) })) {
+  const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
+  if (!canManageLiveMatch(match, { id: user.id, isAdmin: isAdmin(user) }, tournament?.organizerId)) {
     return NextResponse.json({ error: "Only the organizer or an admin can reschedule matches." }, { status: 403 });
   }
   let body: { date?: unknown; venue?: unknown };

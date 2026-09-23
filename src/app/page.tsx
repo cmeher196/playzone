@@ -1,10 +1,10 @@
-import { RegistrationForm } from "@/components/RegistrationForm";
-import { appConfig } from "@/lib/config";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import Link from "next/link";
+import { appConfig } from "@/lib/config";
+import { LoginForm } from "@/components/LoginForm";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 function inviteDestination(value: string | undefined): string {
-  return value?.startsWith("/join/") ? value : "/profile";
+  return value?.startsWith("/join/") ? value : "/tournaments";
 }
 
 export default async function Home({
@@ -14,7 +14,7 @@ export default async function Home({
 }) {
   const { next } = await searchParams;
   const redirectTo = inviteDestination(next);
-  const { appName, leagueName, leagueFullName } = appConfig;
+  const { appName, leagueName } = appConfig;
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[var(--page-bg)] text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -27,10 +27,10 @@ export default async function Home({
         <nav className="mb-4 flex items-center justify-end gap-2">
           <ThemeSwitcher align="right" className="w-40" />
           <Link
-            href={redirectTo === "/profile" ? "/login" : `/login?next=${encodeURIComponent(redirectTo)}`}
+            href={`/register${redirectTo === "/tournaments" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
             className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur transition hover:bg-white/10"
           >
-            Log in
+            Register
           </Link>
         </nav>
         <header className="mb-8 text-center">
@@ -43,17 +43,26 @@ export default async function Home({
             <span className="text-emerald-300">{leagueName}</span>
           </div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Player Registration
+            Welcome back
           </h1>
           <p className="mx-auto mt-2 max-w-md text-white/60">
-            Join <span className="text-white">{leagueFullName}</span>. Create your
-            player profile, then find tournaments to play.
+            Sign in to manage your profile and find tournaments to play.
           </p>
         </header>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/40 backdrop-blur sm:p-7">
-          <RegistrationForm redirectTo={redirectTo} />
+          <LoginForm redirectTo={redirectTo} />
         </div>
+
+        <p className="mt-6 text-center text-sm text-white/50">
+          New player?{" "}
+          <Link
+            href={`/register${redirectTo === "/profile" ? "" : `?next=${encodeURIComponent(redirectTo)}`}`}
+            className="font-medium text-emerald-300 transition hover:text-emerald-200"
+          >
+            Register here
+          </Link>
+        </p>
 
         <footer className="mt-8 text-center text-xs text-white/40">
           <p>

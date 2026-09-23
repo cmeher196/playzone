@@ -98,6 +98,7 @@ export async function POST(
 
   const match = await createLiveMatch({
     tournamentId: id,
+    ownerId: user.id,
     teamA: toRef(teamA),
     teamB: toRef(teamB),
     overs: parsed.data.overs,

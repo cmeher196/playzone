@@ -6,7 +6,7 @@ export interface RegistrationRecord extends RegistrationInput {
   id: string;
   registeredAt: string;
   updatedAt?: string;
-  role?: "admin" | "player";
+  role?: "admin" | "player" | "guest";
   passwordHash?: string;
   photos?: string[];
 }

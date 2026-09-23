@@ -83,7 +83,7 @@ function Section({
       <h2 className="mb-3 text-lg font-semibold text-white">{title}</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {matches.map((m) => (
-          <MatchCard key={m.id} m={m} tournamentName={names.get(m.tournamentId)} />
+          <MatchCard key={m.id} m={m} tournamentName={m.tournamentId ? names.get(m.tournamentId) : "Standalone match"} />
         ))}
       </div>
     </div>
@@ -107,7 +107,7 @@ export default async function MyMatchesPage() {
     const inTeam = [...m.teamA.players, ...m.teamB.players].some(
       (p) => p.playerId === user.id,
     );
-    return inTeam || organizerOf.has(m.tournamentId);
+    return inTeam || (!!m.tournamentId && organizerOf.has(m.tournamentId));
   });
 
   const live = mine.filter((m) => m.status === "live");
@@ -117,15 +117,25 @@ export default async function MyMatchesPage() {
   return (
     <DashboardShell userName={user.name} isAdmin={admin}>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">My Matches</h1>
-        <span className="text-sm text-white/40">
-          {mine.length} match{mine.length === 1 ? "" : "es"}
-        </span>
+        <h1 className="text-2xl font-bold tracking-tight">Matches</h1>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-white/40">
+            {mine.length} match{mine.length === 1 ? "" : "es"}
+          </span>
+          {(admin || organizerOf.size > 0) && (
+            <Link
+              href="/matches/new"
+              className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 px-3 py-2 text-sm font-semibold text-emerald-950 transition hover:from-emerald-400 hover:to-emerald-300"
+            >
+              + New match
+            </Link>
+          )}
+        </div>
       </div>
       <p className="mb-4 text-sm text-white/50">
         {admin
-          ? "All live-scored matches. Open any match for Live, Scorecard, Squads, Overs and Commentary."
-          : "Matches you play in or organise. Open any match for Live, Scorecard, Squads, Overs and Commentary."}
+          ? "Live, upcoming and completed matches across all tournaments. Open any match for Live, Scorecard, Squads, Overs and Commentary."
+          : "Live, upcoming and completed matches you play in or organise. Open any match for Live, Scorecard, Squads, Overs and Commentary."}
       </p>
 
       {mine.length === 0 ? (

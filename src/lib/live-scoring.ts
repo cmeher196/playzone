@@ -69,7 +69,8 @@ export interface StoredInnings {
 
 export interface LiveMatch {
   id: string;
-  tournamentId: string;
+  tournamentId?: string;
+  ownerId?: string;
   teamA: TeamRef;
   teamB: TeamRef;
   overs: number;

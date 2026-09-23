@@ -55,7 +55,8 @@ export async function rescheduleLiveMatch(
 }
 
 export async function createLiveMatch(input: {
-  tournamentId: string;
+  tournamentId?: string;
+  ownerId?: string;
   teamA: TeamRef;
   teamB: TeamRef;
   overs: number;
@@ -79,6 +80,7 @@ export async function createLiveMatch(input: {
   const match: LiveMatch = {
     id: nextMatchId(items),
     tournamentId: input.tournamentId,
+    ownerId: input.ownerId,
     teamA: input.teamA,
     teamB: input.teamB,
     overs: input.overs,
@@ -93,6 +95,18 @@ export async function createLiveMatch(input: {
   items.push(match);
   await writeAll(items);
   return match;
+}
+
+export function canManageLiveMatch(
+  match: Pick<LiveMatch, "tournamentId" | "ownerId">,
+  user: { id: string; isAdmin: boolean },
+  tournamentOrganizerId?: string,
+): boolean {
+  return (
+    user.isAdmin ||
+    match.ownerId === user.id ||
+    (!!tournamentOrganizerId && tournamentOrganizerId === user.id)
+  );
 }
 
 export async function applyEvent(
@@ -170,7 +184,7 @@ export async function completeLiveMatch(id: string): Promise<CompleteResult> {
 
   const scorecard = buildTournamentMatch(match, computed);
   await writeAll(items);
-  await addMatchToTournament(match.tournamentId, scorecard);
+  if (match.tournamentId) await addMatchToTournament(match.tournamentId, scorecard);
   return { match, scorecard };
 }
 

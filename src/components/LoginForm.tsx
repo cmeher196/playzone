@@ -111,6 +111,24 @@ export function LoginForm({ redirectTo = "/tournaments" }: { redirectTo?: string
     }
   }
 
+  async function handleGuestLogin() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/guest", { method: "POST" });
+      if (!res.ok) {
+        setError("Guest access is temporarily unavailable.");
+        return;
+      }
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     if (!verifiedToken) {
@@ -214,9 +232,23 @@ export function LoginForm({ redirectTo = "/tournaments" }: { redirectTo?: string
       {error && <p className={errorClass}>{error}</p>}
       <button
         type="submit"
+        disabled={busy}
         className={primaryBtn}
       >
         {busy ? "Signing in…" : "Sign in"}
+      </button>
+      <div className="flex items-center gap-3 text-xs text-white/30">
+        <span className="h-px flex-1 bg-white/10" />
+        <span>or</span>
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
+      <button
+        type="button"
+        onClick={handleGuestLogin}
+        disabled={busy}
+        className="w-full rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 text-base font-semibold text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Continue as guest
       </button>
       <button
         type="button"

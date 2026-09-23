@@ -17,6 +17,19 @@ const secret =
 
 const SESSION_COOKIE = "cric_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const GUEST_ID = "guest";
+
+const GUEST_USER: PublicPlayer = {
+  id: "GUEST",
+  name: "Guest",
+  mobile: "",
+  gender: "Other",
+  age: 0,
+  playerType: "All-Rounder",
+  role: "guest",
+  registeredAt: "",
+  photos: [],
+};
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16);
@@ -87,6 +100,10 @@ export async function setSessionCookie(id: string): Promise<void> {
   });
 }
 
+export async function setGuestSessionCookie(): Promise<void> {
+  await setSessionCookie(GUEST_ID);
+}
+
 export async function clearSessionCookie(): Promise<void> {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
@@ -97,6 +114,7 @@ export async function getSessionUser(): Promise<PublicPlayer | null> {
   const store = await cookies();
   const id = readSessionToken(store.get(SESSION_COOKIE)?.value);
   if (!id) return null;
+  if (id === GUEST_ID) return GUEST_USER;
   const user = await findById(id);
   return user ? toPublic(user) : null;
 }

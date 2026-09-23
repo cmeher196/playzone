@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
@@ -24,8 +23,8 @@ export default async function MatchPage({
   if (!match) notFound();
 
   const live = computeMatch(match);
-  const tournament = await getTournament(match.tournamentId);
-  const canScore = canManageTournament(tournament ?? { organizerId: "" }, {
+  const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
+  const canScore = match.ownerId === user.id || canManageTournament(tournament ?? { organizerId: "" }, {
     id: user.id,
     isAdmin: isAdmin(user),
   });
@@ -33,8 +32,8 @@ export default async function MatchPage({
 
   return (
     <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>
-      <BackButton fallbackHref={`/tournaments/${match.tournamentId}`}>
-        ← {tournament?.name ?? "Tournament"}
+      <BackButton fallbackHref={match.tournamentId ? `/tournaments/${match.tournamentId}` : "/matches"}>
+        ← {tournament?.name ?? "Matches"}
       </BackButton>
 
       <div className="mt-2 mb-4 flex flex-wrap items-center justify-between gap-3">

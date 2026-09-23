@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { getTournament, canManageTournament } from "@/lib/tournaments";
+import { getTournament } from "@/lib/tournaments";
 import { getLiveMatch, applyEvent } from "@/lib/live-matches";
+import { canManageLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 import { scoreEventSchema } from "@/lib/validation";
 
@@ -23,11 +24,11 @@ export async function POST(
     return NextResponse.json({ error: "Match not found." }, { status: 404 });
   }
 
-  const tournament = await getTournament(match.tournamentId);
-  if (!canManageTournament(tournament ?? { organizerId: "" }, {
+  const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
+  if (!canManageLiveMatch(match, {
     id: user.id,
     isAdmin: isAdmin(user),
-  })) {
+  }, tournament?.organizerId)) {
     return NextResponse.json(
       { error: "Only the match scorer (organizer/admin) can score." },
       { status: 403 },
