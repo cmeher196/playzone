@@ -217,6 +217,15 @@ export const addParticipantsSchema = z.object({
 });
 export type AddParticipantsInput = z.infer<typeof addParticipantsSchema>;
 
+export const chatCreateSchema = z.object({
+  memberIds: z.array(z.string().min(1)).min(1, "Choose at least one player.").max(100, "Too many members."),
+  name: z.string().trim().max(60, "Group name is too long.").optional(),
+});
+
+export const chatMessageSchema = z.object({
+  text: z.string().trim().min(1, "Write a message.").max(500, "Messages can be at most 500 characters."),
+});
+
 export const matchCreateSchema = z
   .object({
     teamAId: z.string().min(1, "Select the first team"),

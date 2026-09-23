@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { appConfig } from "@/lib/config";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 const CRICKET_NAV = [
   { href: "/tournaments", label: "Tournaments", icon: "🏆" },
+  { href: "/chats", label: "Chats", icon: "💬" },
   { href: "/profile", label: "Profile", icon: "👤" },
   { href: "/players", label: "Players", icon: "👥" },
   { href: "/teams/new", label: "Create Team", icon: "🛡️" },
@@ -18,6 +19,7 @@ const CRICKET_NAV = [
 
 const BADMINTON_NAV = [
   { href: "/badminton", label: "Overview", icon: "🏸" },
+  { href: "/chats", label: "Chats", icon: "💬" },
   { href: "/badminton/tournaments", label: "Tournaments", icon: "🏆" },
   { href: "/badminton/players", label: "Players", icon: "👥" },
   { href: "/badminton/matches", label: "My Matches", icon: "🏸" },
@@ -35,7 +37,11 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const badminton = pathname === "/badminton" || pathname.startsWith("/badminton/");
+  const searchParams = useSearchParams();
+  const badminton =
+    pathname === "/badminton" ||
+    pathname.startsWith("/badminton/") ||
+    (pathname === "/chats" && searchParams.get("sport") === "badminton");
   const nav = badminton ? BADMINTON_NAV : CRICKET_NAV;
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -81,12 +87,16 @@ export function DashboardShell({
 
           <nav className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
             {nav.map((item) => {
+              const href =
+                item.href === "/chats"
+                  ? `/chats?sport=${badminton ? "badminton" : "cricket"}`
+                  : item.href;
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   className={`flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
                     active
                       ? "bg-emerald-400/15 text-emerald-200"
