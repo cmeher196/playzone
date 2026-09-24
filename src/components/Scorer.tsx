@@ -75,7 +75,7 @@ export function Scorer({
     if (!pendingExtra) ev = { t: "ball", runs: n };
     else if (pendingExtra === "no-ball")
       ev = { t: "ball", extraType: "no-ball", runs: n };
-    else ev = { t: "ball", extraType: pendingExtra, extraRuns: n };
+    else ev = { t: "ball", runs: 0, extraType: pendingExtra, extraRuns: n };
     const ok = await postEvent(ev);
     if (ok) setPendingExtra(null);
   }
