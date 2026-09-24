@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OtpVerify } from "./OtpVerify";
+import { LoadingOverlay } from "./LoadingOverlay";
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
@@ -167,7 +168,9 @@ export function LoginForm({ redirectTo = "/matches" }: { redirectTo?: string }) 
 
   if (mode === "reset") {
     return (
-      <form onSubmit={handleReset} noValidate className="space-y-5">
+      <>
+        {busy && <LoadingOverlay message="Securing your account…" />}
+        <form onSubmit={handleReset} noValidate className="space-y-5">
         <p className="text-sm text-white/60">
           Verify your mobile number and set a new password.
         </p>
@@ -208,12 +211,15 @@ export function LoginForm({ redirectTo = "/matches" }: { redirectTo?: string }) 
         >
           Back to sign in
         </button>
-      </form>
+        </form>
+      </>
     );
   }
 
   return (
-    <form onSubmit={handleLogin} noValidate className="space-y-5">
+    <>
+      {busy && <LoadingOverlay message="Opening your ground…" />}
+      <form onSubmit={handleLogin} noValidate className="space-y-5">
       <MobileField value={mobile} onChange={setMobile} />
       <div>
         <label htmlFor="password" className={labelClass}>
@@ -257,6 +263,8 @@ export function LoginForm({ redirectTo = "/matches" }: { redirectTo?: string }) 
       >
         Forgot password? Set a new one
       </button>
-    </form>
+      </form>
+    </>
   );
 }
+
