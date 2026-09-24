@@ -352,6 +352,29 @@ Performance and ranking data is derived from stored tournament and match records
 
 ## 11. Badminton
 
+## 10. Cricket Auctions
+
+Routes:
+
+- `/auctions` lists auction rooms.
+- `/auctions/new` creates an auction from registered teams and players.
+- `/auctions/[id]` is the live auction room.
+
+An auction contains registered teams, a purse for every team, a player pool, an organizer, bid history, auction round, and sold/unsold state. The organizer or an administrator controls the room:
+
+- Bring the next player into the room.
+- See the current player and current leading bid.
+- Click a team bid button to place the next bid.
+- The opening bid is exactly the player's ₹1,000 base price. Each later accepted bid must be exactly ₹1,000 above the current bid. The team currently leading the bid is disabled until another team bids.
+- Mark the player Sold, deducting the final price from the winning team's purse and adding the player to that auction squad.
+- Mark the player Pass / Unsold.
+- Bring unsold players back after the pending pool is exhausted for another round.
+- Complete the auction when no pending or unsold players remain.
+
+All authenticated users can view the live board. The board shows team purse balances, spend, bought squads, player status, and the current bid. All purse, bid, and sold-price values are displayed in Indian rupees, not crores. Auction mutations are server-authorized and persisted through the existing JSON/Mongo storage adapter.
+
+## 11. Badminton
+
 Badminton is implemented as a separate sport experience with its own domain modules and UI.
 
 Supported capabilities include:
