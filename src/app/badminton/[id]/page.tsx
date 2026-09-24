@@ -37,6 +37,8 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
 
   // Points table + individual performance from completed matches
   const standings = computeBadmintonStandings(tournament);
+  // Crown the standings leader once the whole tournament is wrapped up.
+  const champion = tournament.status === "completed" ? standings[0] : undefined;
 
   return (
     <DashboardShell userName={user.name} isAdmin={user.role === "admin"}>
@@ -139,6 +141,18 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
             <p className="text-sm text-white/50">No matches created yet.</p>
           )}
         </section>
+
+        {/* Player of the Tournament (shown once the tournament is completed) */}
+        {champion && (
+          <section className="rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-400/10 to-orange-400/[0.06] p-6 text-center">
+            <p className="text-xs uppercase tracking-wide text-amber-200/70">Player of the Tournament</p>
+            <p className="mt-2 text-3xl">🏅</p>
+            <p className="mt-1 text-2xl font-bold text-amber-100">{playerNames[champion.playerId] ?? champion.playerId}</p>
+            <p className="mt-1 text-sm text-white/60">
+              {champion.won}W · {champion.lost}L · {champion.gamesWon}–{champion.gamesLost} games · {champion.pointsFor - champion.pointsAgainst >= 0 ? "+" : ""}{champion.pointsFor - champion.pointsAgainst} pts
+            </p>
+          </section>
+        )}
 
         {/* Points table + individual performance (visible to everyone) */}
         <BadmintonStandings rows={standings} playerNames={playerNames} />

@@ -282,14 +282,15 @@ export function BadmintonLiveScorer({
         </div>
       )}
 
-      {/* Doubles: per-player points + each team's man of the match */}
+      {/* Doubles: per-player points + the winning team's man of the match */}
       {isDoubles && (
         <div className="grid grid-cols-2 gap-4">
           {[
-            { ids: sideAPlayers, accent: "text-emerald-300" },
-            { ids: sideBPlayers, accent: "text-sky-300" },
+            { ids: sideAPlayers, accent: "text-emerald-300", team: "playerA" as const },
+            { ids: sideBPlayers, accent: "text-sky-300", team: "playerB" as const },
           ].map((side, idx) => {
             const motm = manOfTeam(side.ids);
+            const isWinningSide = match.matchWinner === side.team;
             return (
               <div key={idx} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="mb-2 text-xs uppercase tracking-wide text-white/40">Points by player</p>
@@ -308,7 +309,7 @@ export function BadmintonLiveScorer({
                     </li>
                   ))}
                 </ul>
-                {isComplete && motm && (
+                {isComplete && motm && isWinningSide && (
                   <p className={`mt-3 border-t border-white/10 pt-2 text-xs font-medium ${side.accent}`}>
                     🏅 Man of the match: {nameOf(motm)}
                   </p>

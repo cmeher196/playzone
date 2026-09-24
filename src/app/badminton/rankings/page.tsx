@@ -47,7 +47,7 @@ export default async function BadmintonRankingsPage() {
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold">Leaderboard</h2>
-          <span className="text-xs text-white/40">Wins · point difference</span>
+          <span className="text-xs text-white/40">Wins · points · point difference</span>
         </div>
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-white/50">Complete badminton matches to build rankings.</p>
@@ -59,6 +59,9 @@ export default async function BadmintonRankingsPage() {
                 <span className="flex-1 font-medium">{nameOf(row.playerId)}</span>
                 <span className="text-sm text-white/50">{row.played} played</span>
                 <span className="font-semibold text-orange-200">{row.won} W</span>
+                <span className="w-20 text-right text-sm text-white/60" title="Total points scored">
+                  {row.pointsFor} pts
+                </span>
                 <span className="w-16 text-right text-sm text-white/50">
                   {row.pointsFor - row.pointsAgainst >= 0 ? "+" : ""}
                   {row.pointsFor - row.pointsAgainst} PD
