@@ -10,6 +10,7 @@ import {
 } from "./live-scoring";
 import { addMatchToTournament, type Match } from "./tournaments";
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { isScorer, type Scorer } from "./scorers";
 
 async function readAll(): Promise<LiveMatch[]> {
   return readStoredArray<LiveMatch>("liveMatches", "live-matches.json");
@@ -109,6 +110,53 @@ export function canManageLiveMatch(
     match.ownerId === user.id ||
     (!match.ownerId && !!tournamentOrganizerId && tournamentOrganizerId === user.id)
   );
+}
+
+/**
+ * Scorers may score a match (record deliveries, undo, complete it) without
+ * being the owner/organizer/admin. This is intentionally narrower than
+ * `canManageLiveMatch` — scorers cannot reschedule, delete, or otherwise
+ * manage the match, only perform scoring-related actions.
+ */
+export function canScoreLiveMatch(
+  match: Pick<LiveMatch, "tournamentId" | "ownerId" | "scorers">,
+  user: { id: string; isAdmin: boolean },
+  tournamentOrganizerId?: string,
+  tournamentScorers?: Scorer[],
+): boolean {
+  return (
+    canManageLiveMatch(match, user, tournamentOrganizerId) ||
+    isScorer(match.scorers, user.id) ||
+    isScorer(tournamentScorers, user.id)
+  );
+}
+
+export type ScorerMutationResult = LiveMatch | "not-found" | "already-scorer";
+
+export async function addLiveMatchScorer(
+  id: string,
+  scorer: { userId: string; name: string; mobile: string },
+): Promise<ScorerMutationResult> {
+  const items = await readAll();
+  const index = items.findIndex((m) => m.id === id);
+  if (index === -1) return "not-found";
+  const match = items[index];
+  if (isScorer(match.scorers, scorer.userId)) return "already-scorer";
+  match.scorers = [...(match.scorers ?? []), { ...scorer, addedAt: new Date().toISOString() }];
+  await writeAll(items);
+  return match;
+}
+
+export async function removeLiveMatchScorer(
+  id: string,
+  userId: string,
+): Promise<LiveMatch | "not-found"> {
+  const items = await readAll();
+  const index = items.findIndex((m) => m.id === id);
+  if (index === -1) return "not-found";
+  items[index].scorers = (items[index].scorers ?? []).filter((s) => s.userId !== userId);
+  await writeAll(items);
+  return items[index];
 }
 
 export async function applyEvent(

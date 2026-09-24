@@ -4,6 +4,8 @@
  * "undo" is just dropping the last event and recomputing.
  */
 
+import type { Scorer } from "./scorers";
+
 export type Decision = "bat" | "bowl";
 export type ExtraType = "wide" | "no-ball" | "bye" | "leg-bye";
 export type WicketType =
@@ -71,6 +73,8 @@ export interface LiveMatch {
   id: string;
   tournamentId?: string;
   ownerId?: string;
+  /** Users granted the Scorer role for this match (see `canScoreLiveMatch`). */
+  scorers?: Scorer[];
   teamA: TeamRef;
   teamB: TeamRef;
   overs: number;

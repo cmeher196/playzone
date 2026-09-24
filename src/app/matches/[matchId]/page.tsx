@@ -2,12 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTournament } from "@/lib/tournaments";
-import { canManageLiveMatch, getLiveMatch } from "@/lib/live-matches";
+import { canManageLiveMatch, canScoreLiveMatch, getLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 import { DashboardShell } from "@/components/DashboardShell";
 import { Scorer } from "@/components/Scorer";
 import { LiveScoreboard } from "@/components/LiveScoreboard";
 import { RescheduleMatch } from "@/components/RescheduleMatch";
+import { ManageScorers } from "@/components/ManageScorers";
 import { BackButton } from "@/components/BackButton";
 
 export default async function MatchPage({
@@ -24,10 +25,9 @@ export default async function MatchPage({
 
   const live = computeMatch(match);
   const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
-  const canScore = canManageLiveMatch(match, {
-    id: user.id,
-    isAdmin: isAdmin(user),
-  }, tournament?.organizerId);
+  const sessionUser = { id: user.id, isAdmin: isAdmin(user) };
+  const canManage = canManageLiveMatch(match, sessionUser, tournament?.organizerId);
+  const canScore = canScoreLiveMatch(match, sessionUser, tournament?.organizerId, tournament?.scorers);
   const data = { match, live };
 
   return (
@@ -43,7 +43,7 @@ export default async function MatchPage({
         </h1>
         {canScore && match.status !== "completed" && (
           <div className="flex items-center gap-2">
-            {match.status === "scheduled" && <RescheduleMatch matchId={match.id} date={match.date} venue={match.venue} />}
+            {canManage && match.status === "scheduled" && <RescheduleMatch matchId={match.id} date={match.date} venue={match.venue} />}
             <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">Scorer mode</span>
           </div>
         )}
@@ -53,6 +53,13 @@ export default async function MatchPage({
         <Scorer matchId={match.id} initial={data} />
       ) : (
         <LiveScoreboard matchId={match.id} initial={data} />
+      )}
+
+      {canManage && (
+        <div className="mt-6 rounded-3xl border border-amber-300/20 bg-amber-400/[0.04] p-5">
+          <h2 className="mb-3 text-sm font-semibold text-amber-200">Scorers</h2>
+          <ManageScorers endpoint={`/api/matches/${match.id}/scorers`} scorers={match.scorers ?? []} />
+        </div>
       )}
     </DashboardShell>
   );

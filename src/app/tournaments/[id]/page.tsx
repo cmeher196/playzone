@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getTournament, canManageTournament } from "@/lib/tournaments";
+import { getTournament, canManageTournament, isTournamentScorer } from "@/lib/tournaments";
 import { listTeamsForTournament } from "@/lib/teams";
 import { listPlayers } from "@/lib/registrations";
 import { listLiveMatchesForTournament } from "@/lib/live-matches";
@@ -16,6 +16,7 @@ import { TournamentStandings } from "@/components/TournamentStandings";
 import { AddParticipants } from "@/components/AddParticipants";
 import { ShareTournamentButton } from "@/components/ShareTournamentButton";
 import { TournamentParticipants } from "@/components/TournamentParticipants";
+import { ManageScorers } from "@/components/ManageScorers";
 import { appConfig } from "@/lib/config";
 import { formatMatchDate } from "@/lib/format";
 
@@ -41,6 +42,7 @@ export default async function TournamentDetailPage({
     id: user.id,
     isAdmin: admin,
   });
+  const isScorerRole = !canManage && isTournamentScorer(tournament, user.id);
   const matches = tournament.matches ?? [];
   const teams = await listTeamsForTournament(id);
   const allLiveMatches = await listLiveMatchesForTournament(id);
@@ -67,9 +69,11 @@ export default async function TournamentDetailPage({
     ? "👑 Owner"
     : admin
       ? "🛡️ Admin"
-      : joined
-        ? "✓ Participant · view only"
-        : "View only";
+      : isScorerRole
+        ? "🎙️ Scorer"
+        : joined
+          ? "✓ Participant · view only"
+          : "View only";
 
   return (
     <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>
@@ -171,6 +175,16 @@ export default async function TournamentDetailPage({
           <AddParticipants
             tournamentId={tournament.id}
             available={availablePlayers}
+          />
+        </div>
+      )}
+
+      {canManage && (
+        <div className="mt-6 rounded-3xl border border-amber-300/20 bg-amber-400/[0.04] p-5">
+          <h2 className="mb-3 text-sm font-semibold text-amber-200">Scorers</h2>
+          <ManageScorers
+            endpoint={`/api/tournaments/${tournament.id}/scorers`}
+            scorers={tournament.scorers ?? []}
           />
         </div>
       )}

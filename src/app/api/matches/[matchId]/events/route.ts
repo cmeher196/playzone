@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTournament } from "@/lib/tournaments";
-import { getLiveMatch, applyEvent } from "@/lib/live-matches";
-import { canManageLiveMatch } from "@/lib/live-matches";
+import { getLiveMatch, applyEvent, canScoreLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 import { scoreEventSchema } from "@/lib/validation";
 
@@ -25,12 +24,12 @@ export async function POST(
   }
 
   const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
-  if (!canManageLiveMatch(match, {
+  if (!canScoreLiveMatch(match, {
     id: user.id,
     isAdmin: isAdmin(user),
-  }, tournament?.organizerId)) {
+  }, tournament?.organizerId, tournament?.scorers)) {
     return NextResponse.json(
-      { error: "Only the match scorer (organizer/admin) can score." },
+      { error: "Only the owner, organizer, an assigned scorer, or an admin can score." },
       { status: 403 },
     );
   }

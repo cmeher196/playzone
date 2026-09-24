@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTournament } from "@/lib/tournaments";
-import { getLiveMatch, completeLiveMatch } from "@/lib/live-matches";
-import { canManageLiveMatch } from "@/lib/live-matches";
+import { getLiveMatch, completeLiveMatch, canScoreLiveMatch } from "@/lib/live-matches";
 import { computeMatch } from "@/lib/live-scoring";
 
 export const runtime = "nodejs";
@@ -24,10 +23,10 @@ export async function POST(
   }
 
   const tournament = match.tournamentId ? await getTournament(match.tournamentId) : undefined;
-  if (!canManageLiveMatch(match, {
+  if (!canScoreLiveMatch(match, {
     id: user.id,
     isAdmin: isAdmin(user),
-  }, tournament?.organizerId)) {
+  }, tournament?.organizerId, tournament?.scorers)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 

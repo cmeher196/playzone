@@ -1,4 +1,5 @@
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { isScorer, type Scorer } from "./scorers";
 
 // JSON-file storage, mirroring the registrations store. Swap for a real DB later.
 
@@ -71,6 +72,8 @@ export interface Tournament {
   createdAt: string;
   participants: TournamentParticipant[];
   matches?: Match[];
+  /** Users granted the Scorer role across every match in this tournament. */
+  scorers?: Scorer[];
 }
 
 async function readAll(): Promise<Tournament[]> {
@@ -156,6 +159,42 @@ export function canManageTournament(
   user: { id: string; isAdmin: boolean },
 ): boolean {
   return user.isAdmin || tournament.organizerId === user.id;
+}
+
+/** Checks whether a user holds the tournament-level Scorer role. */
+export function isTournamentScorer(
+  tournament: Pick<Tournament, "scorers">,
+  userId: string,
+): boolean {
+  return isScorer(tournament.scorers, userId);
+}
+
+export type ScorerMutationResult = Tournament | "not-found" | "already-scorer";
+
+export async function addTournamentScorer(
+  id: string,
+  scorer: { userId: string; name: string; mobile: string },
+): Promise<ScorerMutationResult> {
+  const items = await readAll();
+  const index = items.findIndex((t) => t.id === id);
+  if (index === -1) return "not-found";
+  const tournament = items[index];
+  if (isScorer(tournament.scorers, scorer.userId)) return "already-scorer";
+  tournament.scorers = [...(tournament.scorers ?? []), { ...scorer, addedAt: new Date().toISOString() }];
+  await writeAll(items);
+  return tournament;
+}
+
+export async function removeTournamentScorer(
+  id: string,
+  userId: string,
+): Promise<Tournament | "not-found"> {
+  const items = await readAll();
+  const index = items.findIndex((t) => t.id === id);
+  if (index === -1) return "not-found";
+  items[index].scorers = (items[index].scorers ?? []).filter((s) => s.userId !== userId);
+  await writeAll(items);
+  return items[index];
 }
 
 export async function updateTournament(

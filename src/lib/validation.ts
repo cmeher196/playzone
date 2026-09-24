@@ -213,6 +213,11 @@ export const newTeamPlayerSchema = z.object({
 });
 export type NewTeamPlayerInput = z.infer<typeof newTeamPlayerSchema>;
 
+export const addScorerSchema = z.object({
+  mobile: mobileField,
+});
+export type AddScorerInput = z.infer<typeof addScorerSchema>;
+
 export const addParticipantsSchema = z.object({
   playerIds: z
     .array(z.string().min(1))
