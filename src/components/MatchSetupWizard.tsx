@@ -7,6 +7,7 @@ import type { Team } from "@/lib/teams";
 type Slot = "A" | "B";
 type Step = "teams" | "players" | "roles" | "details";
 type CoinSide = "Heads" | "Tails";
+type TossMode = "app" | "manual";
 type PlayerOption = { id: string; name: string; mobile: string };
 
 type RoleState = { captain: string; viceCaptain: string; wicketkeeper: string };
@@ -46,6 +47,7 @@ export function MatchSetupWizard({
   const [overs, setOvers] = useState("6");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [venue, setVenue] = useState("");
+  const [tossMode, setTossMode] = useState<TossMode>("app");
   const [caller, setCaller] = useState("");
   const [callerSide, setCallerSide] = useState<CoinSide>("Heads");
   const [coinResult, setCoinResult] = useState<CoinSide | null>(null);
@@ -202,8 +204,16 @@ export function MatchSetupWizard({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    if (!teamA || !teamB || !squadsReady || !coinResult) {
-      setError("Complete both squads and the toss first.");
+    if (!teamA || !teamB || !squadsReady) {
+      setError("Complete both squads first.");
+      return;
+    }
+    if (tossMode === "app" && !coinResult) {
+      setError("Flip the coin to decide the toss, or switch to Manual Toss.");
+      return;
+    }
+    if (tossMode === "manual" && !winner) {
+      setError("Select the toss-winning team.");
       return;
     }
     const oversNumber = Number(overs);
@@ -255,7 +265,7 @@ export function MatchSetupWizard({
   if (step === "teams") return <TeamStep teamA={teamA} teamB={teamB} slot={slot} otherTeam={otherTeam} teams={teams} teamSearch={teamSearch} setTeamSearch={setTeamSearch} showNewTeam={showNewTeam} setShowNewTeam={setShowNewTeam} newTeamName={newTeamName} setNewTeamName={setNewTeamName} busy={busy} error={error} openTeamPicker={openTeamPicker} chooseTeam={chooseTeam} createTeam={createTeam} setSlot={setSlot} setStep={setStep} />;
   if (step === "players") return <PlayerStep slot={slot!} team={currentTeam!} selected={currentSelected} playerSearch={playerSearch} setPlayerSearch={setPlayerSearch} availablePlayers={availablePlayers} newPlayerId={newPlayerId} setNewPlayerId={setNewPlayerId} addPlayer={addPlayer} showNewPlayer={showNewPlayer} setShowNewPlayer={setShowNewPlayer} newPlayerName={newPlayerName} setNewPlayerName={setNewPlayerName} newPlayerMobile={newPlayerMobile} setNewPlayerMobile={setNewPlayerMobile} addNewPlayer={addNewPlayer} busy={busy} error={error} togglePlayer={(id: string) => setSelected((value) => ({ ...value, [slot!]: value[slot!].includes(id) ? value[slot!].filter((item) => item !== id) : [...value[slot!], id] }))} finishPlayers={finishPlayers} back={() => { setSlot(null); setStep("teams"); }} />;
   if (step === "roles") return <RoleStep slot={slot!} team={slot === "A" ? teamA! : teamB!} selected={selected[slot!]} roles={roles[slot!]} setRoles={(value: RoleState) => setRoles((current) => ({ ...current, [slot!]: value }))} error={error} continueStep={() => { const value = roles[slot!]; if (!value.captain || !value.viceCaptain || !value.wicketkeeper) { setError("Choose all three roles."); return; } setError(null); if (slot === "A") { setSlot("B"); setStep("roles"); } else { setSlot(null); setStep("details"); } }} />;
-  return <DetailsStep teamA={teamA!} teamB={teamB!} overs={overs} setOvers={setOvers} date={date} setDate={setDate} venue={venue} setVenue={setVenue} caller={caller} setCaller={(value: string) => { setCaller(value); setCoinResult(null); }} callerSide={callerSide} setCallerSide={(value: CoinSide) => { setCallerSide(value); setCoinResult(null); }} coinResult={coinResult} winner={winner} decision={decision} setDecision={setDecision} flipping={flipping} flipCoin={flipCoin} error={error} busy={busy} submit={submit} back={() => setStep("teams")} />;
+  return <DetailsStep teamA={teamA!} teamB={teamB!} overs={overs} setOvers={setOvers} date={date} setDate={setDate} venue={venue} setVenue={setVenue} tossMode={tossMode} setTossMode={(value: TossMode) => { setTossMode(value); setCoinResult(null); setWinner(""); }} caller={caller} setCaller={(value: string) => { setCaller(value); setCoinResult(null); }} callerSide={callerSide} setCallerSide={(value: CoinSide) => { setCallerSide(value); setCoinResult(null); }} coinResult={coinResult} winner={winner} setWinner={setWinner} decision={decision} setDecision={setDecision} flipping={flipping} flipCoin={flipCoin} error={error} busy={busy} submit={submit} back={() => setStep("teams")} />;
 }
 
 type TeamStepProps = {
@@ -328,9 +338,9 @@ type RoleStepProps = {
 };
 
 function RoleStep(props: RoleStepProps) {
-  const { slot, team, selected, roles, setRoles, error, continueStep } = props;
+  const { team, selected, roles, setRoles, error, continueStep } = props;
   const players = team.players.filter((player: { playerId: string }) => selected.includes(player.playerId));
-  return <section className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6"><h2 className="text-xl font-semibold">Team {slot} roles</h2><p className="text-sm text-white/50">Choose captain, vice-captain and wicketkeeper.</p>{(["captain", "viceCaptain", "wicketkeeper"] as const).map((key) => <label key={key} className={labelClass}>{key === "captain" ? "Captain" : key === "viceCaptain" ? "Vice-captain" : "Wicketkeeper"}<select value={roles[key]} onChange={(event) => setRoles({ ...roles, [key]: event.target.value })} className={inputClass}><option value="">Select player</option>{players.map((player: { playerId: string; name: string }) => <option key={player.playerId} value={player.playerId}>{player.name}</option>)}</select></label>)}{error && <p className="text-sm text-rose-400">{error}</p>}<button type="button" onClick={continueStep} className={buttonClass}>Continue</button></section>;
+  return <section className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6"><h2 className="text-xl font-semibold">{team.name} roles</h2><p className="text-sm text-white/50">Choose captain, vice-captain and wicketkeeper.</p>{(["captain", "viceCaptain", "wicketkeeper"] as const).map((key) => <label key={key} className={labelClass}>{key === "captain" ? "Captain" : key === "viceCaptain" ? "Vice-captain" : "Wicketkeeper"}<select value={roles[key]} onChange={(event) => setRoles({ ...roles, [key]: event.target.value })} className={inputClass}><option value="">Select player</option>{players.map((player: { playerId: string; name: string }) => <option key={player.playerId} value={player.playerId}>{player.name}</option>)}</select></label>)}{error && <p className="text-sm text-rose-400">{error}</p>}<button type="button" onClick={continueStep} className={buttonClass}>Continue</button></section>;
 }
 
 type DetailsStepProps = {
@@ -342,12 +352,15 @@ type DetailsStepProps = {
   setDate: (value: string) => void;
   venue: string;
   setVenue: (value: string) => void;
+  tossMode: TossMode;
+  setTossMode: (value: TossMode) => void;
   caller: string;
   setCaller: (value: string) => void;
   callerSide: CoinSide;
   setCallerSide: (value: CoinSide) => void;
   coinResult: CoinSide | null;
   winner: string;
+  setWinner: (value: string) => void;
   decision: "bat" | "bowl";
   setDecision: (value: "bat" | "bowl") => void;
   flipping: boolean;
@@ -359,8 +372,8 @@ type DetailsStepProps = {
 };
 
 function DetailsStep(props: DetailsStepProps) {
-  const { teamA, teamB, overs, setOvers, date, setDate, venue, setVenue, caller, setCaller, callerSide, setCallerSide, coinResult, winner, decision, setDecision, flipping, flipCoin, error, busy, submit, back } = props;
-  return <form onSubmit={submit} className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6"><button type="button" onClick={back} className="text-sm text-white/50 hover:text-white">← Change teams</button><div className="text-sm text-emerald-300">{teamA.name} vs {teamB.name}</div><div className="grid gap-4 sm:grid-cols-3"><label className={labelClass}>Overs / side<input type="number" min={1} max={50} value={overs} onChange={(event) => setOvers(event.target.value)} className={inputClass} /></label><label className={labelClass}>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} [color-scheme:dark]`} /></label><label className={labelClass}>Venue<input value={venue} onChange={(event) => setVenue(event.target.value)} placeholder="Optional" className={inputClass} /></label></div><div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.05] p-4"><h2 className="font-semibold text-amber-200">Toss</h2><p className="mt-1 text-xs text-white/50">Choose the calling team and side, then flip the coin.</p><div className="mt-4 grid gap-3 sm:grid-cols-3"><select value={caller} onChange={(event) => { setCaller(event.target.value); setCallerSide("Heads"); }} className={inputClass}><option value="">Calling team</option><option value={teamA.id}>{teamA.name}</option><option value={teamB.id}>{teamB.name}</option></select><div className="grid grid-cols-2 gap-2">{(["Heads", "Tails"] as const).map((side) => <button type="button" key={side} onClick={() => setCallerSide(side)} className={`rounded-xl border px-3 py-2 text-sm ${callerSide === side ? "border-amber-300 bg-amber-300/15 text-amber-200" : "border-white/10 text-white/70"}`}>{side}</button>)}</div><button type="button" disabled={!caller || flipping} onClick={flipCoin} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-amber-200 disabled:opacity-50">{flipping ? "Flipping…" : coinResult ?? "Flip coin"}</button></div>{coinResult && <p className="mt-3 text-sm text-white/80">{winner === teamA.id ? teamA.name : teamB.name} won the toss.</p>}<div className="mt-3 grid grid-cols-2 gap-2">{(["bat", "bowl"] as const).map((value) => <button type="button" key={value} disabled={!coinResult} onClick={() => setDecision(value)} className={`rounded-xl border px-3 py-2 text-sm capitalize disabled:opacity-40 ${decision === value ? "border-emerald-400 bg-emerald-400/15 text-emerald-200" : "border-white/10 text-white/70"}`}>{value}</button>)}</div></div>{error && <p className="text-sm text-rose-400">{error}</p>}<button type="submit" disabled={busy || !coinResult} className={buttonClass}>{busy ? "Creating…" : "Create match & open scorer"}</button></form>;
+  const { teamA, teamB, overs, setOvers, date, setDate, venue, setVenue, tossMode, setTossMode, caller, setCaller, callerSide, setCallerSide, coinResult, winner, setWinner, decision, setDecision, flipping, flipCoin, error, busy, submit, back } = props;
+  return <form onSubmit={submit} className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6"><button type="button" onClick={back} className="text-sm text-white/50 hover:text-white">← Change teams</button><div className="text-sm text-emerald-300">{teamA.name} vs {teamB.name}</div><div className="grid gap-4 sm:grid-cols-3"><label className={labelClass}>Overs / side<input type="number" min={1} max={50} value={overs} onChange={(event) => setOvers(event.target.value)} className={inputClass} /></label><label className={labelClass}>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={`${inputClass} [color-scheme:dark]`} /></label><label className={labelClass}>Venue<input value={venue} onChange={(event) => setVenue(event.target.value)} placeholder="Optional" className={inputClass} /></label></div><div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.05] p-4"><h2 className="font-semibold text-amber-200">Toss</h2><p className="mt-1 text-xs text-white/50">Conduct the toss in the app, or enter the result if it was done manually.</p><div className="mt-3 grid grid-cols-2 gap-2">{([{ value: "app" as const, label: "App Toss" }, { value: "manual" as const, label: "Manual Toss" }]).map((mode) => <button type="button" key={mode.value} onClick={() => setTossMode(mode.value)} className={`rounded-xl border px-3 py-2 text-sm font-medium ${tossMode === mode.value ? "border-amber-300 bg-amber-300/15 text-amber-200" : "border-white/10 text-white/70"}`}>{mode.label}</button>)}</div>{tossMode === "app" ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><select value={caller} onChange={(event) => { setCaller(event.target.value); setCallerSide("Heads"); }} className={inputClass}><option value="">Calling team</option><option value={teamA.id}>{teamA.name}</option><option value={teamB.id}>{teamB.name}</option></select><div className="grid grid-cols-2 gap-2">{(["Heads", "Tails"] as const).map((side) => <button type="button" key={side} onClick={() => setCallerSide(side)} className={`rounded-xl border px-3 py-2 text-sm ${callerSide === side ? "border-amber-300 bg-amber-300/15 text-amber-200" : "border-white/10 text-white/70"}`}>{side}</button>)}</div><button type="button" disabled={!caller || flipping} onClick={flipCoin} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-amber-200 disabled:opacity-50">{flipping ? "Flipping…" : coinResult ?? "Flip coin"}</button></div> : <div className="mt-4 grid gap-3 sm:grid-cols-2"><select value={winner} onChange={(event) => setWinner(event.target.value)} className={inputClass}><option value="">Toss-winning team</option><option value={teamA.id}>{teamA.name}</option><option value={teamB.id}>{teamB.name}</option></select></div>}{(tossMode === "app" ? coinResult : winner) && <p className="mt-3 text-sm text-white/80">{winner === teamA.id ? teamA.name : teamB.name} won the toss.</p>}<div className="mt-3 grid grid-cols-2 gap-2">{(["bat", "bowl"] as const).map((value) => <button type="button" key={value} disabled={tossMode === "app" ? !coinResult : !winner} onClick={() => setDecision(value)} className={`rounded-xl border px-3 py-2 text-sm capitalize disabled:opacity-40 ${decision === value ? "border-emerald-400 bg-emerald-400/15 text-emerald-200" : "border-white/10 text-white/70"}`}>{value}</button>)}</div></div>{error && <p className="text-sm text-rose-400">{error}</p>}<button type="submit" disabled={busy || (tossMode === "app" ? !coinResult : !winner)} className={buttonClass}>{busy ? "Creating…" : "Create match & open scorer"}</button></form>;
 }
 
 function TeamSlot({ label, team, onClick }: { label: string; team: Team | null; onClick: () => void }) {
