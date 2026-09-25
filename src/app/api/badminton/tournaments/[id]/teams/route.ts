@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import {
   getBadmintonTournament,
-  createBadmintonMatch,
-  createBadmintonMatchFromTeams,
+  addTeamToBadmintonTournament,
   canManageBadmintonTournament,
 } from "@/lib/badminton-tournaments";
-import {
-  validateBadmintonMatchInput,
-  validateBadmintonTeamMatchInput,
-  isTeamMatchInput,
-} from "@/lib/badminton-validation";
+import { getBadmintonTeams } from "@/lib/badminton-teams";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -27,9 +22,10 @@ export async function GET(_request: NextRequest, { params }: Context) {
       return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
     }
 
-    return NextResponse.json(tournament.matches);
+    const teams = await getBadmintonTeams(tournament.teamIds ?? []);
+    return NextResponse.json(teams);
   } catch (error) {
-    console.error("Error fetching badminton matches:", error);
+    console.error("Error fetching tournament teams:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -52,44 +48,19 @@ export async function POST(request: NextRequest, { params }: Context) {
     }
 
     const body = await request.json();
-
-    // Two creation modes: pick two registered teams, or pick individual players.
-    if (isTeamMatchInput(body)) {
-      const validation = validateBadmintonTeamMatchInput(body);
-      if (!validation.valid) {
-        return NextResponse.json({ error: "Validation failed", errors: validation.errors }, { status: 400 });
-      }
-
-      const result = await createBadmintonMatchFromTeams({
-        tournamentId: id,
-        ...validation.data!,
-      });
-
-      if (typeof result === "string") {
-        return NextResponse.json({ error: result }, { status: 400 });
-      }
-
-      return NextResponse.json(result, { status: 201 });
+    if (!body.teamId || typeof body.teamId !== "string") {
+      return NextResponse.json({ error: "teamId is required" }, { status: 400 });
     }
 
-    const validation = validateBadmintonMatchInput(body);
-
-    if (!validation.valid) {
-      return NextResponse.json({ error: "Validation failed", errors: validation.errors }, { status: 400 });
-    }
-
-    const result = await createBadmintonMatch({
-      tournamentId: id,
-      ...validation.data!,
-    });
-
+    const result = await addTeamToBadmintonTournament(id, body.teamId);
     if (typeof result === "string") {
-      return NextResponse.json({ error: result }, { status: 400 });
+      const status = result === "not-found" || result === "team-not-found" ? 404 : 400;
+      return NextResponse.json({ error: result }, { status });
     }
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Error creating badminton match:", error);
+    console.error("Error adding team to tournament:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { appConfig } from "@/lib/config";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
@@ -23,6 +23,7 @@ const BADMINTON_NAV = [
   { href: "/chats", label: "Chats", icon: "💬" },
   { href: "/badminton/tournaments", label: "Tournaments", icon: "🏆" },
   { href: "/badminton/players", label: "Players", icon: "👥" },
+  { href: "/badminton/teams", label: "Teams", icon: "🛡️" },
   { href: "/badminton/matches", label: "My Matches", icon: "🏸" },
   { href: "/badminton/scoring", label: "Scoring Desk", icon: "📝" },
   { href: "/badminton/rankings", label: "Rankings", icon: "🏅" },
@@ -47,6 +48,34 @@ export function DashboardShell({
   const nav = badminton ? BADMINTON_NAV : CRICKET_NAV;
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  // Keep the Chats badge in sync: poll periodically, on focus, and whenever the
+  // inbox reports that a conversation was read.
+  useEffect(() => {
+    if (guest) return;
+    const refreshUnread = async () => {
+      try {
+        const response = await fetch("/api/chats/unread", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { total?: number };
+        setUnreadChats(data.total ?? 0);
+      } catch {
+        // Ignore transient network errors; the next tick will retry.
+      }
+    };
+    void refreshUnread();
+    const timer = window.setInterval(() => void refreshUnread(), 20000);
+    const onFocus = () => void refreshUnread();
+    const onRead = () => void refreshUnread();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("chats:read", onRead);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("chats:read", onRead);
+    };
+  }, [guest]);
 
   async function logout() {
     setLoggingOut(true);
@@ -111,6 +140,14 @@ export function DashboardShell({
                 >
                   <span aria-hidden>{item.icon}</span>
                   {item.label}
+                  {item.href === "/chats" && !guest && unreadChats > 0 && (
+                    <span
+                      aria-label={`${unreadChats} unread message${unreadChats === 1 ? "" : "s"}`}
+                      className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white"
+                    >
+                      {unreadChats > 99 ? "99+" : unreadChats}
+                    </span>
+                  )}
                 </Link>
               );
             })}

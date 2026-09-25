@@ -43,8 +43,14 @@ export function BadmintonLiveScorer({
   const isDoubles = match.format === "doubles";
   const sideAPlayers = [match.playerA, match.playerC].filter(Boolean) as string[];
   const sideBPlayers = [match.playerB, match.playerD].filter(Boolean) as string[];
-  const teamA = isDoubles ? sideAPlayers.map(nameOf).join(" / ") : nameOf(match.playerA);
-  const teamB = isDoubles ? sideBPlayers.map(nameOf).join(" / ") : nameOf(match.playerB);
+  const playersA = isDoubles ? sideAPlayers.map(nameOf).join(" / ") : nameOf(match.playerA);
+  const playersB = isDoubles ? sideBPlayers.map(nameOf).join(" / ") : nameOf(match.playerB);
+  // Prefer the registered team name as the headline; fall back to the player list.
+  const teamA = match.teamAName ?? playersA;
+  const teamB = match.teamBName ?? playersB;
+  // Player roster shown beneath the team name (blank for player-only matches).
+  const subA = match.teamAName ? playersA : "";
+  const subB = match.teamBName ? playersB : "";
 
   /** The player who scored strictly more than their partner, or null if tied/solo. */
   const manOfTeam = (ids: string[]): string | null => {
@@ -185,6 +191,11 @@ export function BadmintonLiveScorer({
         <h1 className="mt-3 text-2xl font-bold">
           {teamA} <span className="text-white/30">vs</span> {teamB}
         </h1>
+        {(subA || subB) && (
+          <p className="mt-1 text-sm text-white/60">
+            {subA || playersA} <span className="text-white/30">vs</span> {subB || playersB}
+          </p>
+        )}
         <p className="mt-1 text-sm text-white/50 capitalize">
           {match.format} · {match.status}
           {" · "}Games {gamesWon.a}–{gamesWon.b}
@@ -201,12 +212,14 @@ export function BadmintonLiveScorer({
       {/* Scoreboard */}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center">
-          <p className="truncate text-sm text-white/60">{teamA}</p>
+          <p className="truncate text-sm font-medium text-white/80">{teamA}</p>
+          {subA && <p className="truncate text-xs text-white/40">{subA}</p>}
           <p className="mt-2 text-6xl font-bold tabular-nums">{game?.playerAScore ?? 0}</p>
           <p className="mt-2 text-xs text-white/40">Games won: {gamesWon.a}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center">
-          <p className="truncate text-sm text-white/60">{teamB}</p>
+          <p className="truncate text-sm font-medium text-white/80">{teamB}</p>
+          {subB && <p className="truncate text-xs text-white/40">{subB}</p>}
           <p className="mt-2 text-6xl font-bold tabular-nums">{game?.playerBScore ?? 0}</p>
           <p className="mt-2 text-xs text-white/40">Games won: {gamesWon.b}</p>
         </div>

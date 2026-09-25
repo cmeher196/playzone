@@ -7,6 +7,8 @@ import type { PublicPlayer } from "@/lib/registrations";
 import { DashboardShell } from "@/components/DashboardShell";
 import { AddParticipantsForm } from "@/components/AddBadmintonParticipants";
 import { CreateBadmintonMatchForm } from "@/components/CreateBadmintonMatch";
+import { AddBadmintonTeams } from "@/components/AddBadmintonTeams";
+import { listBadmintonTeams } from "@/lib/badminton-teams";
 import { DeleteBadmintonTournament } from "@/components/DeleteBadmintonTournament";
 import { BadmintonMatchManager } from "@/components/BadmintonMatchManager";
 import { BadmintonRandomSchedule } from "@/components/BadmintonRandomSchedule";
@@ -34,6 +36,19 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
 
   // Get participants already in tournament
   const tournamentParticipants = availablePlayers.filter((p) => tournament.participantIds.includes(p.id));
+
+  // Teams: registered in this tournament (for match creation + listing) and
+  // the rest (available for the organizer to add). Only organizers manage these.
+  const allTeams = manageable ? await listBadmintonTeams() : [];
+  const tournamentTeamIds = tournament.teamIds ?? [];
+  const tournamentTeams = allTeams.filter((t) => tournamentTeamIds.includes(t.id));
+  const availableTeams = allTeams.filter((t) => !tournamentTeamIds.includes(t.id));
+  const teamMatchOptions = tournamentTeams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    playerLabel: t.playerIds.map((pid) => playerNames[pid] ?? pid).join(" / "),
+    size: t.playerIds.length,
+  }));
 
   // Points table + individual performance from completed matches
   const standings = computeBadmintonStandings(tournament);
@@ -109,13 +124,15 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
             <div className="space-y-2">
               {tournament.matches.map((match) => {
                 const teamA =
-                  match.format === "doubles"
+                  match.teamAName ??
+                  (match.format === "doubles"
                     ? `${playerNames[match.playerA] ?? match.playerA} / ${playerNames[match.playerC ?? ""] ?? match.playerC ?? ""}`
-                    : playerNames[match.playerA] ?? match.playerA;
+                    : playerNames[match.playerA] ?? match.playerA);
                 const teamB =
-                  match.format === "doubles"
+                  match.teamBName ??
+                  (match.format === "doubles"
                     ? `${playerNames[match.playerB] ?? match.playerB} / ${playerNames[match.playerD ?? ""] ?? match.playerD ?? ""}`
-                    : playerNames[match.playerB] ?? match.playerB;
+                    : playerNames[match.playerB] ?? match.playerB);
                 return (
                   <div key={match.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="min-w-0 flex-1">
@@ -208,11 +225,20 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
               existingIds={tournament.participantIds}
             />
 
-            {tournamentParticipants.length > 0 && (
+            <AddBadmintonTeams
+              tournamentId={tournament.id}
+              teamsInTournament={tournamentTeams}
+              availableTeams={availableTeams}
+              allPlayers={availablePlayers}
+              playerNames={playerNames}
+            />
+
+            {(tournamentParticipants.length > 0 || teamMatchOptions.length >= 2) && (
               <CreateBadmintonMatchForm
                 tournamentId={tournament.id}
                 courts={tournament.courts}
                 participants={tournamentParticipants}
+                teams={teamMatchOptions}
                 defaultBestOf={tournament.bestOf ?? 3}
                 defaultPointsToWin={tournament.pointsToWin ?? 21}
               />
