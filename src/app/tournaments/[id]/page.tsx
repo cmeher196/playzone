@@ -6,7 +6,7 @@ import { listTeamsForTournament } from "@/lib/teams";
 import { listPlayers } from "@/lib/registrations";
 import { listLiveMatchesForTournament } from "@/lib/live-matches";
 import { computeStandings, generateFixtures } from "@/lib/standings";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import { isAdmin } from "@/lib/admin";
 import { JoinTournament } from "@/components/JoinTournament";
@@ -28,7 +28,7 @@ export default async function TournamentDetailPage({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const { id } = await params;
   const tournament = await getTournament(id);

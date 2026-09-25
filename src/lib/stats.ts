@@ -1,5 +1,6 @@
-import { listTournaments } from "./tournaments";
+import { listTournaments, type Match } from "./tournaments";
 import { listPlayers } from "./registrations";
+import { listCompletedStandaloneMatches } from "./live-matches";
 import { computePoints, pointsPerMatch } from "./rating";
 
 export interface PlayerStats {
@@ -73,85 +74,106 @@ function emptyStats(): PlayerStats {
   };
 }
 
-export async function getPlayerPerformance(
+/**
+ * Collects one player's batting/bowling/fielding contribution to a single
+ * completed match, folding it into `stats` and `bestBowling` in place.
+ * Shared by both `getPlayerPerformance` (tournament + standalone matches)
+ * so every real completed match counts the same way regardless of source.
+ */
+function collectPlayerLine(
+  m: Match,
   playerId: string,
-): Promise<{ stats: PlayerStats; recent: RecentMatch[] }> {
-  const tournaments = await listTournaments();
-  const stats = emptyStats();
-  const recent: RecentMatch[] = [];
-  let bestWickets = -1;
-  let bestRuns = Number.POSITIVE_INFINITY;
+  stats: PlayerStats,
+  bestBowling: { wickets: number; runs: number },
+): { batting?: RecentMatch["batting"]; bowling?: RecentMatch["bowling"]; played: boolean } {
+  let played = false;
+  let battingLine: RecentMatch["batting"];
+  let bowlingLine: RecentMatch["bowling"];
 
-  for (const t of tournaments) {
-    for (const m of t.matches ?? []) {
-      if (m.status !== "completed") continue;
-      let played = false;
-      let battingLine: RecentMatch["batting"];
-      let bowlingLine: RecentMatch["bowling"];
+  for (const inn of m.innings) {
+    const bat = inn.batting.find((b) => b.playerId === playerId);
+    if (bat) {
+      played = true;
+      stats.battingInnings += 1;
+      stats.runs += bat.runs;
+      stats.balls += bat.balls;
+      stats.fours += bat.fours;
+      stats.sixes += bat.sixes;
+      if (bat.how === "not out") stats.notOuts += 1;
+      if (bat.runs > stats.highScore) stats.highScore = bat.runs;
+      battingLine = { runs: bat.runs, balls: bat.balls, how: bat.how };
+    }
 
-      for (const inn of m.innings) {
-        const bat = inn.batting.find((b) => b.playerId === playerId);
-        if (bat) {
-          played = true;
-          stats.battingInnings += 1;
-          stats.runs += bat.runs;
-          stats.balls += bat.balls;
-          stats.fours += bat.fours;
-          stats.sixes += bat.sixes;
-          if (bat.how === "not out") stats.notOuts += 1;
-          if (bat.runs > stats.highScore) stats.highScore = bat.runs;
-          battingLine = { runs: bat.runs, balls: bat.balls, how: bat.how };
-        }
-
-        const bowl = inn.bowling.find((b) => b.playerId === playerId);
-        if (bowl) {
-          played = true;
-          stats.bowlingInnings += 1;
-          stats.wickets += bowl.wickets;
-          stats.ballsBowled += oversToBalls(bowl.overs);
-          stats.runsConceded += bowl.runs;
-          stats.maidens += bowl.maidens;
-          if (
-            bowl.wickets > bestWickets ||
-            (bowl.wickets === bestWickets && bowl.runs < bestRuns)
-          ) {
-            bestWickets = bowl.wickets;
-            bestRuns = bowl.runs;
-            stats.bestBowling = `${bowl.wickets}/${bowl.runs}`;
-          }
-          bowlingLine = {
-            wickets: bowl.wickets,
-            runs: bowl.runs,
-            overs: bowl.overs,
-          };
-        }
-
-        for (const f of inn.fielding ?? []) {
-          if (f.playerId === playerId) {
-            played = true;
-            stats.catches += f.catches ?? 0;
-            stats.stumpings += f.stumpings ?? 0;
-            stats.runOuts += f.runOuts ?? 0;
-          }
-        }
+    const bowl = inn.bowling.find((b) => b.playerId === playerId);
+    if (bowl) {
+      played = true;
+      stats.bowlingInnings += 1;
+      stats.wickets += bowl.wickets;
+      stats.ballsBowled += oversToBalls(bowl.overs);
+      stats.runsConceded += bowl.runs;
+      stats.maidens += bowl.maidens;
+      if (
+        bowl.wickets > bestBowling.wickets ||
+        (bowl.wickets === bestBowling.wickets && bowl.runs < bestBowling.runs)
+      ) {
+        bestBowling.wickets = bowl.wickets;
+        bestBowling.runs = bowl.runs;
+        stats.bestBowling = `${bowl.wickets}/${bowl.runs}`;
       }
+      bowlingLine = {
+        wickets: bowl.wickets,
+        runs: bowl.runs,
+        overs: bowl.overs,
+      };
+    }
 
-      if (played) {
-        stats.matches += 1;
-        recent.push({
-          tournamentId: t.id,
-          tournamentName: t.name,
-          matchId: m.id,
-          date: m.date,
-          teamA: m.teamA,
-          teamB: m.teamB,
-          result: m.result,
-          batting: battingLine,
-          bowling: bowlingLine,
-        });
+    for (const f of inn.fielding ?? []) {
+      if (f.playerId === playerId) {
+        played = true;
+        stats.catches += f.catches ?? 0;
+        stats.stumpings += f.stumpings ?? 0;
+        stats.runOuts += f.runOuts ?? 0;
       }
     }
   }
+
+  return { batting: battingLine, bowling: bowlingLine, played };
+}
+
+export async function getPlayerPerformance(
+  playerId: string,
+): Promise<{ stats: PlayerStats; recent: RecentMatch[] }> {
+  const [tournaments, standaloneMatches] = await Promise.all([
+    listTournaments(),
+    listCompletedStandaloneMatches(),
+  ]);
+  const stats = emptyStats();
+  const recent: RecentMatch[] = [];
+  const bestBowling = { wickets: -1, runs: Number.POSITIVE_INFINITY };
+
+  const consider = (m: Match, tournamentId: string, tournamentName: string) => {
+    if (m.status !== "completed") return;
+    const { batting, bowling, played } = collectPlayerLine(m, playerId, stats, bestBowling);
+    if (played) {
+      stats.matches += 1;
+      recent.push({
+        tournamentId,
+        tournamentName,
+        matchId: m.id,
+        date: m.date,
+        teamA: m.teamA,
+        teamB: m.teamB,
+        result: m.result,
+        batting,
+        bowling,
+      });
+    }
+  };
+
+  for (const t of tournaments) {
+    for (const m of t.matches ?? []) consider(m, t.id, t.name);
+  }
+  for (const m of standaloneMatches) consider(m, "", "Standalone match");
 
   const dismissals = stats.battingInnings - stats.notOuts;
   stats.battingAverage = dismissals > 0 ? round(stats.runs / dismissals) : null;
@@ -178,10 +200,66 @@ export interface PlayerAggregate {
   ppm: number;
 }
 
+/**
+ * Folds every batting/bowling/fielding line of one completed match into the
+ * per-player leaderboard aggregates. Shared across tournament and
+ * standalone matches so both count identically.
+ */
+function aggregateMatchIntoLeaderboard(
+  m: Match,
+  ensure: (id: string) => PlayerStats,
+  bestById: Map<string, { w: number; r: number }>,
+): void {
+  if (m.status !== "completed") return;
+  const played = new Set<string>();
+  for (const inn of m.innings) {
+    for (const b of inn.batting) {
+      if (!b.playerId) continue;
+      const s = ensure(b.playerId);
+      s.battingInnings += 1;
+      s.runs += b.runs;
+      s.balls += b.balls;
+      s.fours += b.fours;
+      s.sixes += b.sixes;
+      if (b.how === "not out") s.notOuts += 1;
+      if (b.runs > s.highScore) s.highScore = b.runs;
+      played.add(b.playerId);
+    }
+    for (const bo of inn.bowling) {
+      if (!bo.playerId) continue;
+      const s = ensure(bo.playerId);
+      s.bowlingInnings += 1;
+      s.wickets += bo.wickets;
+      s.ballsBowled += oversToBalls(bo.overs);
+      s.runsConceded += bo.runs;
+      s.maidens += bo.maidens;
+      const prev = bestById.get(bo.playerId);
+      if (
+        !prev ||
+        bo.wickets > prev.w ||
+        (bo.wickets === prev.w && bo.runs < prev.r)
+      ) {
+        bestById.set(bo.playerId, { w: bo.wickets, r: bo.runs });
+      }
+      played.add(bo.playerId);
+    }
+    for (const f of inn.fielding ?? []) {
+      if (!f.playerId) continue;
+      const s = ensure(f.playerId);
+      s.catches += f.catches ?? 0;
+      s.stumpings += f.stumpings ?? 0;
+      s.runOuts += f.runOuts ?? 0;
+      played.add(f.playerId);
+    }
+  }
+  for (const id of played) ensure(id).matches += 1;
+}
+
 /** One efficient pass over every completed match, aggregated per player. */
 export async function getLeaderboardData(): Promise<PlayerAggregate[]> {
-  const [tournaments, players] = await Promise.all([
+  const [tournaments, standaloneMatches, players] = await Promise.all([
     listTournaments(),
+    listCompletedStandaloneMatches(),
     listPlayers(),
   ]);
 
@@ -197,52 +275,9 @@ export async function getLeaderboardData(): Promise<PlayerAggregate[]> {
   };
 
   for (const t of tournaments) {
-    for (const m of t.matches ?? []) {
-      if (m.status !== "completed") continue;
-      const played = new Set<string>();
-      for (const inn of m.innings) {
-        for (const b of inn.batting) {
-          if (!b.playerId) continue;
-          const s = ensure(b.playerId);
-          s.battingInnings += 1;
-          s.runs += b.runs;
-          s.balls += b.balls;
-          s.fours += b.fours;
-          s.sixes += b.sixes;
-          if (b.how === "not out") s.notOuts += 1;
-          if (b.runs > s.highScore) s.highScore = b.runs;
-          played.add(b.playerId);
-        }
-        for (const bo of inn.bowling) {
-          if (!bo.playerId) continue;
-          const s = ensure(bo.playerId);
-          s.bowlingInnings += 1;
-          s.wickets += bo.wickets;
-          s.ballsBowled += oversToBalls(bo.overs);
-          s.runsConceded += bo.runs;
-          s.maidens += bo.maidens;
-          const prev = bestById.get(bo.playerId);
-          if (
-            !prev ||
-            bo.wickets > prev.w ||
-            (bo.wickets === prev.w && bo.runs < prev.r)
-          ) {
-            bestById.set(bo.playerId, { w: bo.wickets, r: bo.runs });
-          }
-          played.add(bo.playerId);
-        }
-        for (const f of inn.fielding ?? []) {
-          if (!f.playerId) continue;
-          const s = ensure(f.playerId);
-          s.catches += f.catches ?? 0;
-          s.stumpings += f.stumpings ?? 0;
-          s.runOuts += f.runOuts ?? 0;
-          played.add(f.playerId);
-        }
-      }
-      for (const id of played) ensure(id).matches += 1;
-    }
+    for (const m of t.matches ?? []) aggregateMatchIntoLeaderboard(m, ensure, bestById);
   }
+  for (const m of standaloneMatches) aggregateMatchIntoLeaderboard(m, ensure, bestById);
 
   return players.map((p) => {
     const s = statsById.get(p.id) ?? emptyStats();

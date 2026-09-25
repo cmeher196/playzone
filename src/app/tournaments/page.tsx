@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { listTournaments } from "@/lib/tournaments";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import { isAdmin } from "@/lib/admin";
 import { appConfig } from "@/lib/config";
@@ -12,7 +12,7 @@ export default async function TournamentsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const tournaments = await listTournaments();
   const { currencySymbol } = appConfig;

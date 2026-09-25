@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getLeaderboardData, type PlayerAggregate } from "@/lib/stats";
 import { battingPoints, bowlingPoints } from "@/lib/rating";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import { isAdmin } from "@/lib/admin";
 
@@ -27,7 +27,7 @@ export default async function RankingsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const players = (await getLeaderboardData()).filter((p) => p.role !== "admin");
 

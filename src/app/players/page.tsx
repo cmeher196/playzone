@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getLeaderboardData } from "@/lib/stats";
 import { ratingTier } from "@/lib/rating";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import { isAdmin } from "@/lib/admin";
 
@@ -18,7 +18,7 @@ export default async function PlayersPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const players = (await getLeaderboardData())
     .filter((p) => p.role !== "admin")

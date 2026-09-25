@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { listTournamentsForPlayer } from "@/lib/tournaments";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { getPlayerPerformance } from "@/lib/stats";
 import { computePoints, pointsPerMatch } from "@/lib/rating";
 import { DashboardShell } from "@/components/DashboardShell";
@@ -18,7 +18,7 @@ export default async function PerformancePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const tournaments = await listTournamentsForPlayer(user.id);
   const { stats, recent } = await getPlayerPerformance(user.id);
@@ -74,7 +74,11 @@ export default async function PerformancePage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <Link
-                    href={`/tournaments/${m.tournamentId}`}
+                    href={
+                      m.matchId.startsWith("LM-")
+                        ? `/matches/${m.matchId}`
+                        : `/tournaments/${m.tournamentId}`
+                    }
                     className="font-medium text-white hover:text-emerald-300"
                   >
                     {m.teamA} vs {m.teamB}

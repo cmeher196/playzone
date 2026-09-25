@@ -5,7 +5,7 @@ import { findById, toPublic } from "@/lib/registrations";
 import { getPlayerPerformance } from "@/lib/stats";
 import { computePoints, pointsPerMatch } from "@/lib/rating";
 import { isAdmin } from "@/lib/admin";
-import { ensureDemoData } from "@/lib/demo-data";
+import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import {
   PlayerRatingCard,
@@ -33,7 +33,7 @@ export default async function PlayerProfilePage({
   const viewer = await getSessionUser();
   if (!viewer) redirect("/login");
 
-  await ensureDemoData();
+  await removeDemoData();
 
   const { id } = await params;
   const record = await findById(id);

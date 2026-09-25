@@ -232,13 +232,28 @@ export async function completeLiveMatch(id: string): Promise<CompleteResult> {
   match.status = "completed";
   match.playerOfTheMatch = pickPlayerOfTheMatch(computed);
 
-  const scorecard = buildTournamentMatch(match, computed);
+  const scorecard = buildMatchScorecard(match, computed);
   await writeAll(items);
   if (match.tournamentId) await addMatchToTournament(match.tournamentId, scorecard);
   return { match, scorecard };
 }
 
-function buildTournamentMatch(
+/** Completed matches that aren't attached to any tournament (created from
+ * `/matches/new` as a standalone match). Their scorecards live only on the
+ * `LiveMatch` record, so they're rebuilt on demand here rather than being
+ * duplicated into tournament storage — used by stats.ts so standalone
+ * matches count toward rankings/performance just like tournament matches. */
+export async function listCompletedStandaloneMatches(): Promise<Match[]> {
+  const items = await readAll();
+  return items
+    .filter((m) => !m.tournamentId && m.status === "completed")
+    .map((m) => buildMatchScorecard(m, computeMatch(m)));
+}
+
+/** Builds the persisted scorecard shape (`Match`) from a live match and its
+ * computed innings state. Used both when completing a tournament match
+ * (persisted onto the tournament) and on-demand for standalone matches. */
+export function buildMatchScorecard(
   match: LiveMatch,
   computed: ComputedMatch,
 ): Match {

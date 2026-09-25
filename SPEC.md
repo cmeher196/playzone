@@ -350,6 +350,13 @@ Player profile capabilities include:
 
 Performance and ranking data is derived from stored tournament and match records. Live score completion is the point at which detailed match statistics become available to downstream views.
 
+Rankings (`/rankings`), the player directory (`/players`), and player performance (`/performance`, `/players/[id]`) contain **no placeholder or sample data**. `getLeaderboardData` and `getPlayerPerformance` (`src/lib/stats.ts`) aggregate strictly from real completed matches, combining two sources:
+
+- Completed matches attached to a tournament (`Tournament.matches`).
+- Completed standalone matches created from `/matches/new` (`listCompletedStandaloneMatches` in `src/lib/live-matches.ts`), whose scorecards are rebuilt on demand from the live match's event log since they are never copied into a tournament.
+
+A previous build auto-seeded a read-only "CricArena Demo Cup" sample tournament so these pages had something to show before scoring existed. That seeding has been removed; `src/lib/demo-data.ts` now only performs a one-time cleanup that deletes the sample tournament if it is still present in storage from before this change. Rankings, leaderboards, and player statistics update automatically as matches are completed — no manual refresh or reseed step is required.
+
 ## 11. Badminton
 
 ## 10. Cricket Auctions
