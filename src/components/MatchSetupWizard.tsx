@@ -223,10 +223,13 @@ export function MatchSetupWizard({
     }
     setBusy(true);
     try {
+      // Standalone matches use the same real team/player ids as tournament
+      // matches (just without a tournamentId) so completed standalone
+      // matches still attribute performance to the real player accounts.
       const response = await fetch(tournamentId ? `/api/tournaments/${tournamentId}/matches` : "/api/matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tournamentId ? {
+        body: JSON.stringify({
           teamAId: teamA.id,
           teamBId: teamB.id,
           teamAPlayerIds: selected.A,
@@ -235,16 +238,6 @@ export function MatchSetupWizard({
           date,
           venue: venue.trim() || undefined,
           tossWinnerId: winner,
-          tossDecision: decision,
-        } : {
-          teamAName: teamA.name,
-          teamBName: teamB.name,
-          teamAPlayers: teamA.players.filter((player) => selected.A.includes(player.playerId)).map((player) => player.name),
-          teamBPlayers: teamB.players.filter((player) => selected.B.includes(player.playerId)).map((player) => player.name),
-          overs: oversNumber,
-          date,
-          venue: venue.trim() || undefined,
-          tossWinnerId: winner === teamA.id ? "direct-a" : "direct-b",
           tossDecision: decision,
         }),
       });

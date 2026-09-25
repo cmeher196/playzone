@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { createLiveMatch } from "@/lib/live-matches";
-import type { TeamRef } from "@/lib/live-scoring";
+import { getTeam, type Team } from "@/lib/teams";
+import { matchCreateSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
-function teamRef(id: string, name: unknown, players: unknown): TeamRef | null {
-  if (typeof name !== "string" || name.trim().length < 2) return null;
-  if (!Array.isArray(players) || players.length < 2) return null;
-  const normalized = players.filter(
-    (player): player is string => typeof player === "string" && player.trim().length >= 2,
-  );
-  if (normalized.length < 2) return null;
+function toRef(team: Team) {
   return {
-    teamId: id,
-    name: name.trim(),
-    players: normalized.map((player, index) => ({
-      playerId: `${id}-player-${index + 1}`,
-      name: player.trim(),
-    })),
+    teamId: team.id,
+    name: team.name,
+    players: team.players.map((p) => ({ playerId: p.playerId, name: p.name })),
+  };
+}
+
+function selectedRef(team: Team, playerIds: string[]) {
+  const selected = new Set(playerIds);
+  return {
+    ...toRef(team),
+    players: team.players
+      .filter((player) => selected.has(player.playerId))
+      .map((p) => ({ playerId: p.playerId, name: p.name })),
   };
 }
 
@@ -28,41 +30,65 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Create an account to organize a match." }, { status: 403 });
   }
 
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const teamA = teamRef("direct-a", body.teamAName, body.teamAPlayers);
-  const teamB = teamRef("direct-b", body.teamBName, body.teamBPlayers);
-  const overs = body.overs;
-  const date = body.date;
-  const tossWinnerId = body.tossWinnerId;
-  const tossDecision = body.tossDecision;
-  if (!teamA || !teamB || teamA.name === teamB.name) {
-    return NextResponse.json({ error: "Enter two different teams with at least two players each." }, { status: 422 });
+  const parsed = matchCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Please check the form." },
+      { status: 422 },
+    );
   }
-  if (typeof overs !== "number" || !Number.isInteger(overs) || overs < 1 || overs > 50) {
-    return NextResponse.json({ error: "Enter between 1 and 50 overs." }, { status: 422 });
+
+  // Standalone matches still use real teams/players (picked via
+  // MatchSetupWizard), just without a tournament attached — this keeps
+  // every player's real registered id on the match so their performance,
+  // stats, and rankings update correctly once it's completed.
+  const teamA = await getTeam(parsed.data.teamAId);
+  const teamB = await getTeam(parsed.data.teamBId);
+  if (!teamA || !teamB) {
+    return NextResponse.json({ error: "Both teams must exist." }, { status: 422 });
   }
-  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return NextResponse.json({ error: "Choose a valid match date." }, { status: 422 });
+  if (teamA.id === teamB.id) {
+    return NextResponse.json({ error: "Pick two different teams." }, { status: 422 });
   }
-  if ((tossWinnerId !== teamA.teamId && tossWinnerId !== teamB.teamId) || (tossDecision !== "bat" && tossDecision !== "bowl")) {
-    return NextResponse.json({ error: "Choose a valid toss result." }, { status: 422 });
+  if (
+    parsed.data.teamAPlayerIds.some(
+      (playerId) => !teamA.players.some((player) => player.playerId === playerId),
+    ) ||
+    parsed.data.teamBPlayerIds.some(
+      (playerId) => !teamB.players.some((player) => player.playerId === playerId),
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Selected players must belong to their respective teams." },
+      { status: 422 },
+    );
+  }
+  if (
+    parsed.data.tossWinnerId !== teamA.id &&
+    parsed.data.tossWinnerId !== teamB.id
+  ) {
+    return NextResponse.json(
+      { error: "Toss winner must be one of the two teams." },
+      { status: 422 },
+    );
   }
 
   const match = await createLiveMatch({
     ownerId: user.id,
-    teamA,
-    teamB,
-    overs,
-    venue: typeof body.venue === "string" ? body.venue.trim() || undefined : undefined,
-    date,
-    tossWinnerTeamId: tossWinnerId,
-    tossDecision,
+    teamA: selectedRef(teamA, parsed.data.teamAPlayerIds),
+    teamB: selectedRef(teamB, parsed.data.teamBPlayerIds),
+    overs: parsed.data.overs,
+    venue: parsed.data.venue,
+    date: parsed.data.date,
+    tossWinnerTeamId: parsed.data.tossWinnerId,
+    tossDecision: parsed.data.tossDecision,
   });
   return NextResponse.json({ match }, { status: 201 });
 }
