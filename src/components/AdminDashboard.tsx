@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PublicPlayer } from "@/lib/registrations";
-import { GENDERS, PLAYER_TYPES } from "@/lib/validation";
+import { GENDERS, PLAYER_TYPES, BATTING_HANDS, BOWLING_STYLES } from "@/lib/validation";
 
 const ROLE_BADGE: Record<string, string> = {
   admin: "border-amber-400/30 bg-amber-400/15 text-amber-300",
@@ -22,6 +22,8 @@ type EditFields = {
   gender: (typeof GENDERS)[number];
   age: number;
   playerType: (typeof PLAYER_TYPES)[number];
+  battingHand: (typeof BATTING_HANDS)[number];
+  bowlingStyle: (typeof BOWLING_STYLES)[number];
 };
 
 export function AdminDashboard({
@@ -153,6 +155,8 @@ export function AdminDashboard({
                     </div>
                     <div className="mt-1 text-sm text-white/50">
                       {a.playerType} · {a.gender} · {a.age} yrs
+                      {a.battingHand && ` · ${a.battingHand}`}
+                      {a.bowlingStyle && ` · ${a.bowlingStyle}`}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-white/60">
                       <span>📱 +91 {a.mobile}</span>
@@ -248,6 +252,12 @@ function EditForm({
   const [playerType, setPlayerType] = useState<EditFields["playerType"]>(
     account.playerType,
   );
+  const [battingHand, setBattingHand] = useState<EditFields["battingHand"]>(
+    account.battingHand ?? "Right-Handed",
+  );
+  const [bowlingStyle, setBowlingStyle] = useState<EditFields["bowlingStyle"]>(
+    account.bowlingStyle ?? "Does Not Bowl",
+  );
 
   const field =
     "mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60";
@@ -303,11 +313,43 @@ function EditForm({
           ))}
         </select>
       </label>
+      <label className="text-xs text-white/50">
+        Batting hand
+        <select
+          value={battingHand}
+          onChange={(e) =>
+            setBattingHand(e.target.value as EditFields["battingHand"])
+          }
+          className={field}
+        >
+          {BATTING_HANDS.map((h) => (
+            <option key={h} value={h} className="bg-[#0a1712]">
+              {h}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-xs text-white/50">
+        Bowling style
+        <select
+          value={bowlingStyle}
+          onChange={(e) =>
+            setBowlingStyle(e.target.value as EditFields["bowlingStyle"])
+          }
+          className={field}
+        >
+          {BOWLING_STYLES.map((s) => (
+            <option key={s} value={s} className="bg-[#0a1712]">
+              {s}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex gap-2 sm:col-span-2">
         <button
           type="button"
           disabled={busy}
-          onClick={() => onSave({ name, gender, age: Number(age), playerType })}
+          onClick={() => onSave({ name, gender, age: Number(age), playerType, battingHand, bowlingStyle })}
           className="rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:from-emerald-400 hover:to-emerald-300 disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save changes"}

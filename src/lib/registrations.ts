@@ -165,6 +165,8 @@ export async function ensureAdminAccount(params: {
     gender: "Other",
     age: 30,
     playerType: "All-Rounder",
+    battingHand: "Right-Handed",
+    bowlingStyle: "Does Not Bowl",
     role: "admin",
     passwordHash: params.passwordHash,
     registeredAt: new Date().toISOString(),

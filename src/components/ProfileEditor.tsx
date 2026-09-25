@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GENDERS, PLAYER_TYPES } from "@/lib/validation";
+import { GENDERS, PLAYER_TYPES, BATTING_HANDS, BOWLING_STYLES } from "@/lib/validation";
 import type { PublicPlayer } from "@/lib/registrations";
 import { OtpVerify } from "./OtpVerify";
 
@@ -30,6 +30,12 @@ export function ProfileEditor({ user }: { user: PublicPlayer }) {
   const [playerType, setPlayerType] = useState<PublicPlayer["playerType"]>(
     user.playerType,
   );
+  const [battingHand, setBattingHand] = useState<PublicPlayer["battingHand"]>(
+    user.battingHand ?? "Right-Handed",
+  );
+  const [bowlingStyle, setBowlingStyle] = useState<PublicPlayer["bowlingStyle"]>(
+    user.bowlingStyle ?? "Does Not Bowl",
+  );
 
   const [mobile, setMobile] = useState(user.mobile);
   const [editingMobile, setEditingMobile] = useState(false);
@@ -52,12 +58,9 @@ export function ProfileEditor({ user }: { user: PublicPlayer }) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  useEffect(() => {
-    if (verifiedMobile && mobile !== verifiedMobile) {
-      setVerifiedToken(null);
-      setVerifiedMobile("");
-    }
-  }, [mobile, verifiedMobile]);
+  // `mobileVerified` already re-derives from `verifiedMobile === mobile` on
+  // every render, and `OtpVerify` resets its own UI when its `mobile` prop
+  // changes — so no effect is needed to "unverify" stale state here.
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +79,8 @@ export function ProfileEditor({ user }: { user: PublicPlayer }) {
           age: Number(age),
           gender,
           playerType,
+          battingHand,
+          bowlingStyle,
           mobile,
           ...(mobileChanged ? { verificationToken: verifiedToken } : {}),
         }),
@@ -330,6 +335,38 @@ export function ProfileEditor({ user }: { user: PublicPlayer }) {
                 key={option}
                 onClick={() => setPlayerType(option)}
                 className={chip(playerType === option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className={labelClass}>Batting hand</span>
+          <div className="grid grid-cols-2 gap-2.5">
+            {BATTING_HANDS.map((option) => (
+              <button
+                type="button"
+                key={option}
+                onClick={() => setBattingHand(option)}
+                className={chip(battingHand === option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className={labelClass}>Bowling style</span>
+          <div className="grid grid-cols-2 gap-2.5">
+            {BOWLING_STYLES.map((option) => (
+              <button
+                type="button"
+                key={option}
+                onClick={() => setBowlingStyle(option)}
+                className={chip(bowlingStyle === option)}
               >
                 {option}
               </button>

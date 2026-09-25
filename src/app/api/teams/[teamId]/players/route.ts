@@ -55,6 +55,8 @@ export async function POST(
       gender: "Other",
       age: 18,
       playerType: "All-Rounder",
+      battingHand: "Right-Handed",
+      bowlingStyle: "Does Not Bowl",
     });
     playerId = created.id;
     playerName = created.name;

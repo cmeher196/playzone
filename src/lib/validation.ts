@@ -9,8 +9,22 @@ export const PLAYER_TYPES = [
 
 export const GENDERS = ["Male", "Female", "Other"] as const;
 
+export const BATTING_HANDS = ["Right-Handed", "Left-Handed"] as const;
+
+export const BOWLING_STYLES = [
+  "Right-Arm Fast",
+  "Right-Arm Medium",
+  "Right-Arm Spin",
+  "Left-Arm Fast",
+  "Left-Arm Medium",
+  "Left-Arm Spin",
+  "Does Not Bowl",
+] as const;
+
 export type PlayerType = (typeof PLAYER_TYPES)[number];
 export type Gender = (typeof GENDERS)[number];
+export type BattingHand = (typeof BATTING_HANDS)[number];
+export type BowlingStyle = (typeof BOWLING_STYLES)[number];
 
 const mobileField = z
   .string()
@@ -35,6 +49,8 @@ export const registrationSchema = z.object({
     .min(8, "Age must be between 8 and 70")
     .max(70, "Age must be between 8 and 70"),
   playerType: z.enum(PLAYER_TYPES, { error: "Select your playing role" }),
+  battingHand: z.enum(BATTING_HANDS, { error: "Select your batting hand" }),
+  bowlingStyle: z.enum(BOWLING_STYLES, { error: "Select your bowling style" }),
 });
 
 export type RegistrationInput = z.infer<typeof registrationSchema>;
@@ -63,7 +79,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 // Profile edit. Changing the mobile number requires a fresh OTP token.
 export const profileUpdateSchema = registrationSchema
-  .pick({ name: true, gender: true, age: true, playerType: true, mobile: true })
+  .pick({ name: true, gender: true, age: true, playerType: true, battingHand: true, bowlingStyle: true, mobile: true })
   .extend({ verificationToken: z.string().optional() });
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
@@ -86,6 +102,8 @@ export const adminUserUpdateSchema = z.object({
     .max(70, "Age must be between 8 and 70")
     .optional(),
   playerType: z.enum(PLAYER_TYPES).optional(),
+  battingHand: z.enum(BATTING_HANDS).optional(),
+  bowlingStyle: z.enum(BOWLING_STYLES).optional(),
   role: z.enum(ACCOUNT_ROLES).optional(),
 });
 export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateSchema>;

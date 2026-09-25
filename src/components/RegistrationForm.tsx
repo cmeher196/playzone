@@ -9,6 +9,8 @@ import {
   type RegistrationFormInput,
   PLAYER_TYPES,
   GENDERS,
+  BATTING_HANDS,
+  BOWLING_STYLES,
 } from "@/lib/validation";
 
 const PLAYER_TYPE_ICONS: Record<(typeof PLAYER_TYPES)[number], string> = {
@@ -212,6 +214,70 @@ export function RegistrationForm({ redirectTo = "/profile" }: { redirectTo?: str
           />
           {errors.playerType && (
             <p className={errorClass}>{errors.playerType.message}</p>
+          )}
+        </div>
+
+        <div>
+          <span className={labelClass}>Batting hand</span>
+          <Controller
+            control={control}
+            name="battingHand"
+            render={({ field }) => (
+              <div className="grid grid-cols-2 gap-2.5">
+                {BATTING_HANDS.map((option) => {
+                  const active = field.value === option;
+                  return (
+                    <button
+                      type="button"
+                      key={option}
+                      onClick={() => field.onChange(option)}
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                        active
+                          ? "border-emerald-400 bg-emerald-400/15 text-emerald-100"
+                          : "border-white/10 bg-white/5 text-white/70 hover:border-white/25"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
+          {errors.battingHand && (
+            <p className={errorClass}>{errors.battingHand.message}</p>
+          )}
+        </div>
+
+        <div>
+          <span className={labelClass}>Bowling style</span>
+          <Controller
+            control={control}
+            name="bowlingStyle"
+            render={({ field }) => (
+              <div className="grid grid-cols-2 gap-2.5">
+                {BOWLING_STYLES.map((option) => {
+                  const active = field.value === option;
+                  return (
+                    <button
+                      type="button"
+                      key={option}
+                      onClick={() => field.onChange(option)}
+                      className={`rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition ${
+                        active
+                          ? "border-emerald-400 bg-emerald-400/15 text-emerald-100"
+                          : "border-white/10 bg-white/5 text-white/70 hover:border-white/25"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
+          {errors.bowlingStyle && (
+            <p className={errorClass}>{errors.bowlingStyle.message}</p>
           )}
         </div>
 

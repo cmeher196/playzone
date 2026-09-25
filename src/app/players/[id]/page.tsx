@@ -87,6 +87,16 @@ export default async function PlayerProfilePage({
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs">
                 {player.playerType}
               </span>
+              {player.battingHand && (
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs">
+                  🏏 {player.battingHand}
+                </span>
+              )}
+              {player.bowlingStyle && (
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs">
+                  🎯 {player.bowlingStyle}
+                </span>
+              )}
               <span>
                 {player.gender} · {player.age} yrs
               </span>

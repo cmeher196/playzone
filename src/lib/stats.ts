@@ -170,6 +170,8 @@ export interface PlayerAggregate {
   id: string;
   name: string;
   playerType: string;
+  battingHand?: string;
+  bowlingStyle?: string;
   role?: string;
   stats: PlayerStats;
   points: number;
@@ -256,6 +258,8 @@ export async function getLeaderboardData(): Promise<PlayerAggregate[]> {
       id: p.id,
       name: p.name,
       playerType: p.playerType,
+      battingHand: p.battingHand,
+      bowlingStyle: p.bowlingStyle,
       role: p.role,
       stats: s,
       points,

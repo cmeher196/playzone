@@ -40,6 +40,8 @@ export default async function PerformancePage() {
         <h1 className="text-2xl font-bold tracking-tight">My Performance</h1>
         <p className="mt-1 text-sm text-white/50">
           {user.name} · {user.playerType}
+          {user.battingHand && ` · ${user.battingHand}`}
+          {user.bowlingStyle && ` · ${user.bowlingStyle}`}
         </p>
       </div>
 

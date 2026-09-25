@@ -26,6 +26,8 @@ const GUEST_USER: PublicPlayer = {
   gender: "Other",
   age: 0,
   playerType: "All-Rounder",
+  battingHand: "Right-Handed",
+  bowlingStyle: "Does Not Bowl",
   role: "guest",
   registeredAt: "",
   photos: [],

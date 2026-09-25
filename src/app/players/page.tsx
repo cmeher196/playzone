@@ -60,7 +60,10 @@ export default async function PlayersPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-white">{p.name}</div>
                     <div className="truncate text-xs text-white/50">
-                      {p.playerType} · {p.stats.matches} matches · {p.stats.runs}{" "}
+                      {p.playerType}
+                      {p.battingHand && ` · ${p.battingHand}`}
+                      {p.bowlingStyle && ` · ${p.bowlingStyle}`}
+                      {" · "}{p.stats.matches} matches · {p.stats.runs}{" "}
                       runs · {p.stats.wickets} wkts
                     </div>
                   </div>

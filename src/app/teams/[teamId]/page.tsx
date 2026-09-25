@@ -27,7 +27,9 @@ export default async function TeamDetailPage({
     isAdmin: isAdmin(user),
   });
 
-  const eligible = (await listPlayers())
+  const allPlayers = await listPlayers();
+  const playersById = new Map(allPlayers.map((player) => [player.id, player]));
+  const eligible = allPlayers
     .filter((player) => player.role !== "admin" && !team.players.some((member) => member.playerId === player.id))
     .map((player) => ({ playerId: player.id, name: player.name, mobile: player.mobile }));
 
@@ -63,31 +65,41 @@ export default async function TeamDetailPage({
           </p>
         ) : (
           <ul className="space-y-2">
-            {team.players.map((p) => (
-              <li
-                key={p.playerId}
-                className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-sm"
-              >
-                <Link
-                  href={`/players/${p.playerId}`}
-                  className="text-white transition hover:text-emerald-300"
+            {team.players.map((p) => {
+              const details = playersById.get(p.playerId);
+              return (
+                <li
+                  key={p.playerId}
+                  className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 text-sm"
                 >
-                  {p.playerNumber !== undefined ? `#${p.playerNumber} ` : ""}{p.name}
-                </Link>
-                <span className="flex gap-1">
-                  {team.captainId === p.playerId && (
-                    <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-medium text-amber-300">
-                      C
-                    </span>
-                  )}
-                  {team.viceCaptainId === p.playerId && (
-                    <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-xs font-medium text-sky-300">
-                      VC
-                    </span>
-                  )}
-                </span>
-              </li>
-            ))}
+                  <div className="min-w-0">
+                    <Link
+                      href={`/players/${p.playerId}`}
+                      className="text-white transition hover:text-emerald-300"
+                    >
+                      {p.playerNumber !== undefined ? `#${p.playerNumber} ` : ""}{p.name}
+                    </Link>
+                    {details && (details.battingHand || details.bowlingStyle) && (
+                      <div className="mt-0.5 text-xs text-white/40">
+                        {[details.battingHand, details.bowlingStyle].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                  <span className="flex shrink-0 gap-1">
+                    {team.captainId === p.playerId && (
+                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-medium text-amber-300">
+                        C
+                      </span>
+                    )}
+                    {team.viceCaptainId === p.playerId && (
+                      <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-xs font-medium text-sky-300">
+                        VC
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
