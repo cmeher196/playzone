@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { getBadmintonTeam, type BadmintonTeam } from "./badminton-teams";
 
 // Badminton-specific tournament, court, and match types
 // Extends the cricket tournament concept to support multiple courts and rally-point scoring
@@ -32,6 +33,12 @@ export interface BadmintonMatch {
   playerB: string; // playerId ("" when TBD in a bracket)
   playerC?: string; // playerId (doubles only)
   playerD?: string; // playerId (doubles only)
+  // Set when the match was created from registered teams (display + grouping only;
+  // scoring/standings still run on the playerA/B/C/D fields above).
+  teamAId?: string;
+  teamBId?: string;
+  teamAName?: string; // cached team label at creation time
+  teamBName?: string;
   status: BadmintonMatchStatus;
   assignedScorerId?: string; // null if not assigned
   bestOf?: number; // games per match (overrides tournament default)
@@ -76,6 +83,7 @@ export interface BadmintonTournament {
   organizerId: string;
   organizerName: string;
   participantIds: string[]; // Player IDs registered for tournament
+  teamIds?: string[]; // Badminton team IDs registered for this tournament
   bestOf?: number; // games per match (default 3)
   pointsToWin?: number; // points to win a game (default 21)
   createdAt: string;
@@ -83,7 +91,8 @@ export interface BadmintonTournament {
 }
 
 async function readAll(): Promise<BadmintonTournament[]> {
-  return readStoredArray<BadmintonTournament>("badmintonTournaments", "badminton-tournaments.json");
+  const items = await readStoredArray<BadmintonTournament>("badmintonTournaments", "badminton-tournaments.json");
+  return items.map((tournament) => ({ ...tournament, teamIds: tournament.teamIds ?? [] }));
 }
 
 async function writeAll(items: BadmintonTournament[]): Promise<void> {
@@ -142,7 +151,7 @@ export async function createBadmintonTournament(input: {
 
 export async function updateBadmintonTournament(
   id: string,
-  patch: Partial<Pick<BadmintonTournament, "name" | "description" | "venue" | "status" | "participantIds">>,
+  patch: Partial<Pick<BadmintonTournament, "name" | "description" | "venue" | "status" | "participantIds" | "teamIds">>,
 ): Promise<BadmintonTournament | undefined> {
   const items = await readAll();
   const index = items.findIndex((t) => t.id === id);
@@ -244,6 +253,120 @@ export async function createBadmintonMatch(input: {
   tournament.matches.push(match);
   await writeAll(items);
   return match;
+}
+
+export type CreateTeamMatchResult =
+  | BadmintonMatch
+  | "tournament-not-found"
+  | "court-not-found"
+  | "court-busy"
+  | "team-not-found"
+  | "same-team"
+  | "team-size-mismatch";
+
+/**
+ * Creates a match between two registered teams. Format is derived from the team
+ * size (both teams with two players → doubles, both with one → singles) and the
+ * individual players are copied into playerA/B/C/D so scoring works unchanged.
+ */
+export async function createBadmintonMatchFromTeams(input: {
+  tournamentId: string;
+  courtId: string;
+  teamAId: string;
+  teamBId: string;
+  bestOf?: number;
+  pointsToWin?: number;
+}): Promise<CreateTeamMatchResult> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === input.tournamentId);
+  if (!tournament) return "tournament-not-found";
+
+  const court = tournament.courts.find((c) => c.id === input.courtId);
+  if (!court) return "court-not-found";
+
+  if (input.teamAId === input.teamBId) return "same-team";
+
+  const [teamA, teamB] = await Promise.all([
+    getBadmintonTeam(input.teamAId),
+    getBadmintonTeam(input.teamBId),
+  ]);
+  if (!teamA || !teamB) return "team-not-found";
+
+  const roster = (team: BadmintonTeam) => team.playerIds.filter(Boolean);
+  const aPlayers = roster(teamA);
+  const bPlayers = roster(teamB);
+  if (aPlayers.length === 0 || bPlayers.length === 0 || aPlayers.length !== bPlayers.length) {
+    return "team-size-mismatch";
+  }
+
+  const matchOnCourt = tournament.matches.find(
+    (m) => m.courtId === input.courtId && (m.status === "live" || m.status === "ready"),
+  );
+  if (matchOnCourt) return "court-busy";
+
+  const format: BadmintonMatchFormat = aPlayers.length === 2 ? "doubles" : "singles";
+  const match: BadmintonMatch = {
+    id: nextBadmintonMatchId(tournament.matches),
+    courtId: input.courtId,
+    tournamentId: input.tournamentId,
+    format,
+    playerA: aPlayers[0],
+    playerB: bPlayers[0],
+    playerC: format === "doubles" ? aPlayers[1] : undefined,
+    playerD: format === "doubles" ? bPlayers[1] : undefined,
+    teamAId: teamA.id,
+    teamBId: teamB.id,
+    teamAName: teamA.name,
+    teamBName: teamB.name,
+    status: "scheduled",
+    bestOf: input.bestOf,
+    pointsToWin: input.pointsToWin,
+    games: blankGames(input.bestOf ?? tournament.bestOf ?? 3),
+    currentGameIndex: 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  tournament.matches.push(match);
+  await writeAll(items);
+  return match;
+}
+
+/** Registers an existing team into a tournament and enrolls its players. */
+export async function addTeamToBadmintonTournament(
+  tournamentId: string,
+  teamId: string,
+): Promise<BadmintonTournament | "not-found" | "team-not-found" | "already-added"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const team = await getBadmintonTeam(teamId);
+  if (!team) return "team-not-found";
+
+  const teamIds = tournament.teamIds ?? [];
+  if (teamIds.includes(teamId)) return "already-added";
+  tournament.teamIds = [...teamIds, teamId];
+
+  // Enrol the team's players so they appear in participant-based UIs (scorer
+  // assignment, "my matches", etc.).
+  const participants = new Set(tournament.participantIds);
+  for (const pid of team.playerIds) participants.add(pid);
+  tournament.participantIds = [...participants];
+
+  await writeAll(items);
+  return tournament;
+}
+
+/** Removes a team from a tournament (its players stay enrolled). */
+export async function removeTeamFromBadmintonTournament(
+  tournamentId: string,
+  teamId: string,
+): Promise<BadmintonTournament | "not-found"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  tournament.teamIds = (tournament.teamIds ?? []).filter((id) => id !== teamId);
+  await writeAll(items);
+  return tournament;
 }
 
 /** Randomly seeds participants into a single-elimination knockout bracket. */

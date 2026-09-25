@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { ChatMessage, ChatPreview } from "@/lib/chats";
 
 interface PlayerOption {
@@ -43,6 +43,45 @@ export function ChatsInbox({
     };
     void refreshMessages();
     const timer = window.setInterval(() => void refreshMessages(), 6000);
+    return () => window.clearInterval(timer);
+  }, [selectedId]);
+
+  // Persist a read marker (and refresh the nav badge) whenever a conversation
+  // is open — on open and each time new messages arrive while it's on screen.
+  // The open chat already renders as read via the `selectedId` guard below, so
+  // no local state update is needed here.
+  const markRead = useCallback((chatId: string) => {
+    void fetch(`/api/chats/${chatId}/read`, { method: "POST" })
+      .then(() => window.dispatchEvent(new Event("chats:read")))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    markRead(selectedId);
+  }, [selectedId, messages.length, markRead]);
+
+  // Keep the per-conversation unread badges in the list fresh; the open chat
+  // always shows as read.
+  useEffect(() => {
+    const refreshUnread = async () => {
+      try {
+        const response = await fetch("/api/chats/unread", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { byConversation?: Record<string, number> };
+        const counts = data.byConversation ?? {};
+        setChats((current) =>
+          current.map((chat) => ({
+            ...chat,
+            unreadCount: chat.id === selectedId ? 0 : counts[chat.id] ?? 0,
+          })),
+        );
+      } catch {
+        // Ignore transient errors; the next tick retries.
+      }
+    };
+    void refreshUnread();
+    const timer = window.setInterval(() => void refreshUnread(), 15000);
     return () => window.clearInterval(timer);
   }, [selectedId]);
 
@@ -120,12 +159,22 @@ export function ChatsInbox({
           <button type="button" onClick={() => setShowNew((value) => !value)} className="rounded-lg bg-emerald-400 px-3 py-1.5 text-sm font-semibold text-emerald-950 hover:bg-emerald-300">New</button>
         </div>
         <div className="max-h-72 overflow-y-auto px-2 pb-3 md:max-h-[560px]">
-          {chats.map((chat) => (
-            <button key={chat.id} type="button" onClick={() => { setSelectedId(chat.id); setShowNew(false); setError(null); }} className={`mb-1 w-full rounded-xl px-3 py-3 text-left transition ${selectedId === chat.id ? "bg-emerald-400/15" : "hover:bg-white/5"}`}>
-              <div className="truncate font-medium text-white">{chat.isGroup ? "Group: " : ""}{chat.name}</div>
-              <div className="mt-1 truncate text-xs text-white/45">{chat.lastMessage ? `${chat.lastMessage.senderName}: ${chat.lastMessage.text}` : "No messages yet"}</div>
-            </button>
-          ))}
+          {chats.map((chat) => {
+            const unread = chat.id === selectedId ? 0 : chat.unreadCount ?? 0;
+            return (
+              <button key={chat.id} type="button" onClick={() => { setSelectedId(chat.id); setShowNew(false); setError(null); }} className={`mb-1 w-full rounded-xl px-3 py-3 text-left transition ${selectedId === chat.id ? "bg-emerald-400/15" : "hover:bg-white/5"}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className={`truncate text-white ${unread > 0 ? "font-semibold" : "font-medium"}`}>{chat.isGroup ? "Group: " : ""}{chat.name}</div>
+                  {unread > 0 && (
+                    <span className="inline-flex min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                </div>
+                <div className={`mt-1 truncate text-xs ${unread > 0 ? "text-white/70" : "text-white/45"}`}>{chat.lastMessage ? `${chat.lastMessage.senderName}: ${chat.lastMessage.text}` : "No messages yet"}</div>
+              </button>
+            );
+          })}
           {chats.length === 0 && !showNew && <p className="px-3 py-6 text-center text-sm text-white/45">No chats yet.</p>}
         </div>
       </aside>

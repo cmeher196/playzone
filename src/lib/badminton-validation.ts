@@ -258,3 +258,138 @@ export function validateAssignScorerInput(input: unknown): {
     },
   };
 }
+
+export interface CreateBadmintonTeamInput {
+  name: string;
+  logo?: string;
+  playerIds: string[];
+}
+
+export function validateCreateBadmintonTeamInput(input: unknown): {
+  valid: boolean;
+  errors: string[];
+  data?: CreateBadmintonTeamInput;
+} {
+  const errors: string[] = [];
+
+  if (!input || typeof input !== "object") {
+    return { valid: false, errors: ["Input must be an object"] };
+  }
+
+  const data = input as Record<string, unknown>;
+
+  if (!data.name || typeof data.name !== "string" || data.name.trim().length === 0) {
+    errors.push("Team name is required");
+  } else if (data.name.length > 60) {
+    errors.push("Team name must be 60 characters or less");
+  }
+
+  if (data.logo !== undefined && data.logo !== null && typeof data.logo !== "string") {
+    errors.push("Logo must be a string");
+  }
+
+  const rawPlayers = Array.isArray(data.playerIds) ? data.playerIds : [];
+  const playerIds = [
+    ...new Set(rawPlayers.filter((id): id is string => typeof id === "string" && id.trim().length > 0)),
+  ];
+  if (playerIds.length < 1 || playerIds.length > 2) {
+    errors.push("A team must have one or two players");
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    data: {
+      name: (data.name as string).trim(),
+      logo: data.logo ? (data.logo as string) : undefined,
+      playerIds,
+    },
+  };
+}
+
+export interface CreateBadmintonTeamMatchInput {
+  courtId: string;
+  teamAId: string;
+  teamBId: string;
+  bestOf?: number;
+  pointsToWin?: number;
+}
+
+/** Returns true when a match-create body targets teams rather than raw players. */
+export function isTeamMatchInput(input: unknown): boolean {
+  return (
+    !!input &&
+    typeof input === "object" &&
+    typeof (input as Record<string, unknown>).teamAId === "string" &&
+    typeof (input as Record<string, unknown>).teamBId === "string"
+  );
+}
+
+export function validateBadmintonTeamMatchInput(input: unknown): {
+  valid: boolean;
+  errors: string[];
+  data?: CreateBadmintonTeamMatchInput;
+} {
+  const errors: string[] = [];
+
+  if (!input || typeof input !== "object") {
+    return { valid: false, errors: ["Input must be an object"] };
+  }
+
+  const data = input as Record<string, unknown>;
+
+  if (!data.courtId || typeof data.courtId !== "string") {
+    errors.push("Court ID is required and must be a string");
+  }
+  if (!data.teamAId || typeof data.teamAId !== "string") {
+    errors.push("Team A is required");
+  }
+  if (!data.teamBId || typeof data.teamBId !== "string") {
+    errors.push("Team B is required");
+  }
+  if (typeof data.teamAId === "string" && data.teamAId === data.teamBId) {
+    errors.push("Team A and Team B must be different");
+  }
+
+  if (data.bestOf !== undefined && data.bestOf !== null) {
+    if (!Number.isInteger(data.bestOf)) {
+      errors.push("Number of games must be an integer");
+    } else if ((data.bestOf as number) < BADMINTON_MIN_BEST_OF || (data.bestOf as number) > BADMINTON_MAX_BEST_OF) {
+      errors.push(`Number of games must be between ${BADMINTON_MIN_BEST_OF} and ${BADMINTON_MAX_BEST_OF}`);
+    }
+  }
+
+  if (data.pointsToWin !== undefined && data.pointsToWin !== null) {
+    if (!Number.isInteger(data.pointsToWin)) {
+      errors.push("Points per game must be an integer");
+    } else if (
+      (data.pointsToWin as number) < BADMINTON_MIN_POINTS_TO_WIN ||
+      (data.pointsToWin as number) > BADMINTON_MAX_POINTS_TO_WIN
+    ) {
+      errors.push(
+        `Points per game must be between ${BADMINTON_MIN_POINTS_TO_WIN} and ${BADMINTON_MAX_POINTS_TO_WIN}`,
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    data: {
+      courtId: data.courtId as string,
+      teamAId: data.teamAId as string,
+      teamBId: data.teamBId as string,
+      bestOf: typeof data.bestOf === "number" ? (data.bestOf as number) : undefined,
+      pointsToWin: typeof data.pointsToWin === "number" ? (data.pointsToWin as number) : undefined,
+    },
+  };
+}
+
