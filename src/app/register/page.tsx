@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { RegistrationForm } from "@/components/RegistrationForm";
 import { appConfig } from "@/lib/config";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -36,6 +37,15 @@ export default async function RegisterPage({
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/40 backdrop-blur sm:p-7">
           <RegistrationForm redirectTo={redirectTo} />
         </div>
+        <p className="mt-6 text-center text-sm text-white/50">
+          Already have an account?{" "}
+          <Link
+            href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+            className="font-medium text-emerald-300 transition hover:text-emerald-200"
+          >
+            Log in here
+          </Link>
+        </p>
       </div>
     </main>
   );
