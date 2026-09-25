@@ -163,23 +163,37 @@ export function ballsToOvers(balls: number): string {
   return `${Math.floor(balls / 6)}.${balls % 6}`;
 }
 
-function dismissalText(w: WicketInfo, nameOf: (id: string) => string): string {
-  const bowler = ""; // filled by caller context if needed
+/**
+ * Describes a dismissal for display, e.g. "Bowled by Rahul",
+ * "Caught by Amit, Bowled by Rahul", "Run Out by Suresh". Credits the
+ * fielder (catch/stumping/run-out) and the bowler (every type except
+ * run-out, matching how `bowler.wickets` is tallied below).
+ */
+function dismissalText(
+  w: WicketInfo,
+  nameOf: (id: string) => string,
+  bowlerName: string,
+): string {
+  const fielderName = w.fielderId ? nameOf(w.fielderId) : undefined;
   switch (w.type) {
     case "bowled":
-      return "bowled";
+      return `b ${bowlerName}`;
     case "lbw":
-      return "lbw";
+      return `lbw b ${bowlerName}`;
     case "hit-wicket":
-      return "hit wicket";
+      return `hit wicket b ${bowlerName}`;
     case "caught":
-      return w.fielderId ? `c ${nameOf(w.fielderId)}` : "caught";
+      return fielderName
+        ? `c ${fielderName} b ${bowlerName}`
+        : `c and b${bowlerName}`;
     case "stumped":
-      return w.fielderId ? `st ${nameOf(w.fielderId)}` : "stumped";
+      return fielderName
+        ? `stumped ${fielderName} b ${bowlerName}`
+        : `stumped and b ${bowlerName}`;
     case "run-out":
-      return w.fielderId ? `run out (${nameOf(w.fielderId)})` : "run out";
+      return fielderName ? `run out ${fielderName}` : "run out";
     default:
-      return String(bowler);
+      return String(w.type);
   }
 }
 
@@ -348,7 +362,7 @@ export function reduceInnings(
         const w = ev.wicket;
         const d = ensureBat(w.dismissedId);
         d.out = true;
-        d.how = dismissalText(w, nameOf);
+        d.how = dismissalText(w, nameOf, bowlerName);
         wickets += 1;
         if (w.type !== "run-out") bowler.wickets += 1;
         if (w.fielderId) {
@@ -372,7 +386,7 @@ export function reduceInnings(
       let outcome: string;
       if (dismissed) {
         label = "W";
-        outcome = `OUT! ${ev.wicket ? dismissalText(ev.wicket, nameOf) : ""}`.trim();
+        outcome = `OUT! ${ev.wicket ? dismissalText(ev.wicket, nameOf, bowlerName) : ""}`.trim();
       } else if (et === "wide") {
         const total = 1 + extraRan;
         label = total > 1 ? `${total}wd` : "wd";
