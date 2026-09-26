@@ -17,6 +17,9 @@ export function ManageTeam({
   const [selected, setSelected] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
   const [playerNumber, setPlayerNumber] = useState("1");
+  const [showNewPlayer, setShowNewPlayer] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerMobile, setNewPlayerMobile] = useState("");
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(team.name);
   const [logo, setLogo] = useState(team.logo ?? "");
@@ -52,6 +55,27 @@ export function ManageTeam({
     if (ok) {
       setSelected("");
       setPlayerNumber("1");
+    }
+  }
+
+  async function addNewPlayer() {
+    if (newPlayerName.trim().length < 2 || !/^[6-9]\d{9}$/.test(newPlayerMobile)) {
+      setError("Enter a player name and valid 10-digit mobile number.");
+      return;
+    }
+    const ok = await call(`/api/teams/${team.id}/players`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        newPlayer: { name: newPlayerName.trim(), mobile: newPlayerMobile },
+        playerNumber,
+      }),
+    });
+    if (ok) {
+      setNewPlayerName("");
+      setNewPlayerMobile("");
+      setPlayerNumber("1");
+      setShowNewPlayer(false);
     }
   }
 
@@ -248,6 +272,53 @@ export function ManageTeam({
           <p className="mt-1 text-xs text-white/40">
             All registered players are already in this team.
           </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setShowNewPlayer(!showNewPlayer)}
+          className="mt-2 w-full rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20"
+        >
+          + Add new player
+        </button>
+        {showNewPlayer && (
+          <div className="mt-2 space-y-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-3">
+            <input
+              value={newPlayerName}
+              onChange={(e) => setNewPlayerName(e.target.value)}
+              placeholder="Player full name"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
+            />
+            <div className="flex gap-2">
+              <input
+                value={newPlayerMobile}
+                onChange={(e) => setNewPlayerMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                placeholder="10-digit mobile number"
+                inputMode="numeric"
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
+              />
+              <label className="w-28 shrink-0 text-xs text-white/50">
+                Jersey no.
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  value={playerNumber}
+                  onChange={(e) => setPlayerNumber(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                  aria-label="Jersey number"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={addNewPlayer}
+              disabled={busy}
+              className="w-full rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-40"
+            >
+              {busy ? "Adding…" : "Create and add player"}
+            </button>
+          </div>
         )}
       </div>
 
