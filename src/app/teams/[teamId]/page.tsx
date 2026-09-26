@@ -7,6 +7,7 @@ import { getTeam, canManageTeamForUser } from "@/lib/teams";
 import { listPlayers } from "@/lib/registrations";
 import { DashboardShell } from "@/components/DashboardShell";
 import { ManageTeam } from "@/components/ManageTeam";
+import { ManageCoOwners } from "@/components/ManageCoOwners";
 import { BackButton } from "@/components/BackButton";
 
 export default async function TeamDetailPage({
@@ -107,6 +108,13 @@ export default async function TeamDetailPage({
       {canManage && (
         <div className="mt-6">
           <ManageTeam team={team} eligible={eligible} />
+        </div>
+      )}
+
+      {canManage && (
+        <div className="mt-6 rounded-3xl border border-amber-300/20 bg-amber-400/[0.04] p-5">
+          <h2 className="mb-3 text-sm font-semibold text-amber-200">Co-owners</h2>
+          <ManageCoOwners teamId={team.id} coOwners={team.coOwners ?? []} />
         </div>
       )}
     </DashboardShell>

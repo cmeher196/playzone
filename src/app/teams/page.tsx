@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { listTeamsForUser } from "@/lib/teams";
+import { listTeamsForUser, isTeamCoOwner } from "@/lib/teams";
 import { DashboardShell } from "@/components/DashboardShell";
 
 export default async function TeamsPage() {
@@ -40,6 +40,8 @@ export default async function TeamsPage() {
         <ul className="grid gap-3 sm:grid-cols-2">
           {teams.map((team) => {
             const isOwner = team.ownerId === user.id;
+            const isCoOwner = !isOwner && isTeamCoOwner(team, user.id);
+            const roleLabel = isOwner ? "Owner" : isCoOwner ? "Co-owner" : "Player";
             return (
               <li key={team.id}>
                 <Link
@@ -65,12 +67,12 @@ export default async function TeamsPage() {
                       </span>
                       <span
                         className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          isOwner
+                          isOwner || isCoOwner
                             ? "bg-amber-400/15 text-amber-300"
                             : "bg-sky-400/15 text-sky-300"
                         }`}
                       >
-                        {isOwner ? "Owner" : "Player"}
+                        {roleLabel}
                       </span>
                     </div>
                     <div className="text-xs text-white/50">

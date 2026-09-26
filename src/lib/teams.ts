@@ -1,5 +1,6 @@
 import { getTournament } from "./tournaments";
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { isScorer, type Scorer } from "./scorers";
 
 // JSON-file storage, mirroring the other stores. Swap for a real DB later.
 // A team can participate in more than one tournament. `tournamentId` remains
@@ -19,6 +20,8 @@ export interface Team {
   logo?: string;
   ownerId: string;
   ownerName: string;
+  /** Users granted full co-owner management rights over this team. */
+  coOwners?: Scorer[];
   captainId?: string;
   viceCaptainId?: string;
   players: TeamPlayer[];
@@ -59,12 +62,14 @@ export async function listTeamsForMember(playerId: string): Promise<Team[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Every team a user owns or plays in, deduplicated, for their "My Teams" list. */
+/** Every team a user owns, co-owns, or plays in, deduplicated, for their "My Teams" list. */
 export async function listTeamsForUser(userId: string): Promise<Team[]> {
   const items = await readAll();
   const relevant = items.filter(
     (team) =>
-      team.ownerId === userId || team.players.some((player) => player.playerId === userId),
+      team.ownerId === userId ||
+      isScorer(team.coOwners, userId) ||
+      team.players.some((player) => player.playerId === userId),
   );
   return relevant.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -148,6 +153,7 @@ export async function cloneTeamForTournament(
     logo: source.logo,
     ownerId,
     ownerName,
+    coOwners: source.coOwners?.map((coOwner) => ({ ...coOwner })),
     captainId: source.captainId,
     viceCaptainId: source.viceCaptainId,
     players: source.players.map((player) => ({ ...player })),
@@ -241,11 +247,44 @@ export async function canManageTeamForUser(
   team: Team,
   user: { id: string; isAdmin: boolean },
 ): Promise<boolean> {
-  if (user.isAdmin || team.ownerId === user.id) return true;
+  if (user.isAdmin || team.ownerId === user.id || isTeamCoOwner(team, user.id)) return true;
   const tournaments = await Promise.all(
     (team.tournamentIds ?? []).map((tournamentId) => getTournament(tournamentId)),
   );
   return tournaments.some((tournament) => tournament?.organizerId === user.id);
+}
+
+/** Checks whether a user holds the co-owner role on a team. */
+export function isTeamCoOwner(team: Pick<Team, "coOwners">, userId: string): boolean {
+  return isScorer(team.coOwners, userId);
+}
+
+export type CoOwnerMutationResult = Team | "not-found" | "already-co-owner";
+
+export async function addTeamCoOwner(
+  teamId: string,
+  coOwner: { userId: string; name: string; mobile: string },
+): Promise<CoOwnerMutationResult> {
+  const items = await readAll();
+  const index = items.findIndex((t) => t.id === teamId);
+  if (index === -1) return "not-found";
+  const team = items[index];
+  if (isScorer(team.coOwners, coOwner.userId)) return "already-co-owner";
+  team.coOwners = [...(team.coOwners ?? []), { ...coOwner, addedAt: new Date().toISOString() }];
+  await writeAll(items);
+  return team;
+}
+
+export async function removeTeamCoOwner(
+  teamId: string,
+  userId: string,
+): Promise<Team | "not-found"> {
+  const items = await readAll();
+  const index = items.findIndex((t) => t.id === teamId);
+  if (index === -1) return "not-found";
+  items[index].coOwners = (items[index].coOwners ?? []).filter((c) => c.userId !== userId);
+  await writeAll(items);
+  return items[index];
 }
 
 // Sequential ids: TM-001, TM-002, …
