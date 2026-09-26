@@ -51,6 +51,24 @@ export async function listTeamsForOwner(ownerId: string): Promise<Team[]> {
   return items.filter((team) => team.ownerId === ownerId).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Teams a player belongs to as a squad member (regardless of who owns the team). */
+export async function listTeamsForMember(playerId: string): Promise<Team[]> {
+  const items = await readAll();
+  return items
+    .filter((team) => team.players.some((player) => player.playerId === playerId))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Every team a user owns or plays in, deduplicated, for their "My Teams" list. */
+export async function listTeamsForUser(userId: string): Promise<Team[]> {
+  const items = await readAll();
+  const relevant = items.filter(
+    (team) =>
+      team.ownerId === userId || team.players.some((player) => player.playerId === userId),
+  );
+  return relevant.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function listTeams(): Promise<Team[]> {
   const items = await readAll();
   return items.sort((a, b) => a.name.localeCompare(b.name));

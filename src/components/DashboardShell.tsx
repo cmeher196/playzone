@@ -11,7 +11,7 @@ const CRICKET_NAV = [
   { href: "/chats", label: "Chats", icon: "💬" },
   { href: "/profile", label: "Profile", icon: "👤" },
   { href: "/players", label: "Players", icon: "👥" },
-  { href: "/teams/new", label: "Create Team", icon: "🛡️" },
+  { href: "/teams", label: "Teams", icon: "🛡️" },
   { href: "/matches", label: "Matches", icon: "🏏" },
   { href: "/auctions", label: "Auctions", icon: "🔨" },
   { href: "/rankings", label: "Rankings", icon: "🏅" },

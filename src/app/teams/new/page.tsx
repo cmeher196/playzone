@@ -10,8 +10,8 @@ export default async function NewStandaloneTeamPage() {
   if (!user) redirect("/login");
   return (
     <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>
-      <Link href="/tournaments" className="text-sm text-white/50 transition hover:text-white/80">
-        ← Back to tournaments
+      <Link href="/teams" className="text-sm text-white/50 transition hover:text-white/80">
+        ← Back to teams
       </Link>
       <div className="mt-2 mb-5">
         <h1 className="text-2xl font-bold tracking-tight">Create a team</h1>
