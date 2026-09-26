@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getBadmintonTournament, canManageBadmintonTournament, computeBadmintonStandings } from "@/lib/badminton-tournaments";
+import { getBadmintonTournament, canManageBadmintonTournament, computeBadmintonStandings, computeBadmintonGroupStandings } from "@/lib/badminton-tournaments";
 import { listPlayers } from "@/lib/registrations";
 import type { PublicPlayer } from "@/lib/registrations";
 import { DashboardShell } from "@/components/DashboardShell";
@@ -13,6 +13,8 @@ import { DeleteBadmintonTournament } from "@/components/DeleteBadmintonTournamen
 import { BadmintonMatchManager } from "@/components/BadmintonMatchManager";
 import { BadmintonRandomSchedule } from "@/components/BadmintonRandomSchedule";
 import { BadmintonStandings, BadmintonPerformance } from "@/components/BadmintonStandings";
+import { BadmintonGroupStandings } from "@/components/BadmintonGroupStandings";
+import { BadmintonGroupManager } from "@/components/BadmintonGroupManager";
 import { ShareTournamentButton } from "@/components/ShareTournamentButton";
 
 export default async function BadmintonDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,11 +40,16 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
   const tournamentParticipants = availablePlayers.filter((p) => tournament.participantIds.includes(p.id));
 
   // Teams: registered in this tournament (for match creation + listing) and
-  // the rest (available for the organizer to add). Only organizers manage these.
-  const allTeams = manageable ? await listBadmintonTeams() : [];
+  // the rest (available for the organizer to add). Team names are resolved for
+  // everyone so the public group tables can label rows.
+  const allTeams = await listBadmintonTeams();
   const tournamentTeamIds = tournament.teamIds ?? [];
   const tournamentTeams = allTeams.filter((t) => tournamentTeamIds.includes(t.id));
   const availableTeams = allTeams.filter((t) => !tournamentTeamIds.includes(t.id));
+
+  // Map of teamId -> team name for the group tables and knockout labels.
+  const teamNames: Record<string, string> = {};
+  for (const t of allTeams) teamNames[t.id] = t.name;
   const teamMatchOptions = tournamentTeams.map((t) => ({
     id: t.id,
     name: t.name,
@@ -52,8 +59,31 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
 
   // Points table + individual performance from completed matches
   const standings = computeBadmintonStandings(tournament);
-  // Crown the standings leader once the whole tournament is wrapped up.
-  const champion = tournament.status === "completed" ? standings[0] : undefined;
+
+  // Group stage: per-group team tables, stage progress, and the team champion.
+  const groupStage = tournament.groupStage;
+  const groupStandings = groupStage
+    ? groupStage.groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        rows: computeBadmintonGroupStandings(tournament, g.id),
+      }))
+    : [];
+  const groupMatches = tournament.matches.filter((m) => m.groupId);
+  const hasGroupMatches = groupMatches.length > 0;
+  const groupStageComplete = hasGroupMatches && groupMatches.every((m) => m.status === "completed");
+  const hasKnockout = tournament.matches.some((m) => m.round && !m.groupId);
+  const finalMatch = tournament.matches.find(
+    (m) => m.round === "Final" && !m.groupId && m.status === "completed" && m.matchWinner,
+  );
+  const teamChampionId = finalMatch
+    ? finalMatch.matchWinner === "playerA"
+      ? finalMatch.teamAId
+      : finalMatch.teamBId
+    : undefined;
+
+  // Crown the standings leader once a non-group tournament is wrapped up.
+  const champion = !groupStage && tournament.status === "completed" ? standings[0] : undefined;
 
   return (
     <DashboardShell userName={user.name} isAdmin={user.role === "admin"}>
@@ -136,7 +166,14 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
                 return (
                   <div key={match.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-white/50">Court {tournament.courts.find((c) => c.id === match.courtId)?.number} · {match.format}</p>
+                      <p className="text-xs text-white/50">
+                        Court {tournament.courts.find((c) => c.id === match.courtId)?.number} · {match.format}
+                        {match.groupId
+                          ? ` · ${groupStage?.groups.find((g) => g.id === match.groupId)?.name ?? "Group"}`
+                          : match.round
+                            ? ` · ${match.round}`
+                            : ""}
+                      </p>
                       <p className="mt-1 font-medium">
                         {teamA} <span className="text-white/30">vs</span> {teamB}
                       </p>
@@ -159,6 +196,16 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
           )}
         </section>
 
+        {/* Team Champions (winner of the knockout final in a group tournament) */}
+        {teamChampionId && (
+          <section className="rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-400/10 to-orange-400/[0.06] p-6 text-center">
+            <p className="text-xs uppercase tracking-wide text-amber-200/70">Champions</p>
+            <p className="mt-2 text-3xl">🏆</p>
+            <p className="mt-1 text-2xl font-bold text-amber-100">{teamNames[teamChampionId] ?? teamChampionId}</p>
+            <p className="mt-1 text-sm text-white/60">Winners of the knockout stage</p>
+          </section>
+        )}
+
         {/* Player of the Tournament (shown once the tournament is completed) */}
         {champion && (
           <section className="rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-400/10 to-orange-400/[0.06] p-6 text-center">
@@ -172,7 +219,15 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
         )}
 
         {/* Points table + individual performance (visible to everyone) */}
-        <BadmintonStandings rows={standings} playerNames={playerNames} />
+        {groupStage ? (
+          <BadmintonGroupStandings
+            groups={groupStandings}
+            teamNames={teamNames}
+            advanceCount={groupStage.advanceCount}
+          />
+        ) : (
+          <BadmintonStandings rows={standings} playerNames={playerNames} />
+        )}
         <BadmintonPerformance rows={standings} playerNames={playerNames} />
 
         {/* Tournament Info */}
@@ -244,7 +299,23 @@ export default async function BadmintonDetailPage({ params }: { params: Promise<
               />
             )}
 
-            {tournamentParticipants.length > 0 && (
+            {groupStage && (
+              <BadmintonGroupManager
+                tournamentId={tournament.id}
+                groups={groupStage.groups}
+                advanceCount={groupStage.advanceCount}
+                teams={tournamentTeams.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  playerLabel: t.playerIds.map((pid) => playerNames[pid] ?? pid).join(" / "),
+                }))}
+                hasGroupMatches={hasGroupMatches}
+                hasKnockout={hasKnockout}
+                groupStageComplete={groupStageComplete}
+              />
+            )}
+
+            {!groupStage && tournamentParticipants.length > 0 && (
               <BadmintonRandomSchedule
                 tournamentId={tournament.id}
                 participantCount={tournamentParticipants.length}

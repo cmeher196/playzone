@@ -9,6 +9,10 @@ export const BADMINTON_MIN_POINTS_TO_WIN = 5;
 export const BADMINTON_MAX_POINTS_TO_WIN = 99;
 export const BADMINTON_DEFAULT_BEST_OF = 3;
 export const BADMINTON_DEFAULT_POINTS_TO_WIN = 21;
+export const BADMINTON_MIN_GROUP_COUNT = 2;
+export const BADMINTON_MAX_GROUP_COUNT = 16;
+export const BADMINTON_MIN_ADVANCE_COUNT = 1;
+export const BADMINTON_MAX_ADVANCE_COUNT = 4;
 
 export interface CreateBadmintonTournamentInput {
   name: string;
@@ -17,6 +21,7 @@ export interface CreateBadmintonTournamentInput {
   courtCount: number;
   bestOf: number;
   pointsToWin: number;
+  groupStage?: { groupCount: number; advanceCount: number };
 }
 
 export function validateBadmintonTournamentInput(input: unknown): {
@@ -94,6 +99,34 @@ export function validateBadmintonTournamentInput(input: unknown): {
     }
   }
 
+  // Optional group stage (enableGroups + groupCount + advanceCount)
+  let groupStage: { groupCount: number; advanceCount: number } | undefined;
+  if (data.enableGroups === true) {
+    const groupCount = data.groupCount;
+    const advanceCount = data.advanceCount;
+    if (!Number.isInteger(groupCount)) {
+      errors.push("Number of groups must be an integer");
+    } else if (
+      (groupCount as number) < BADMINTON_MIN_GROUP_COUNT ||
+      (groupCount as number) > BADMINTON_MAX_GROUP_COUNT
+    ) {
+      errors.push(`Number of groups must be between ${BADMINTON_MIN_GROUP_COUNT} and ${BADMINTON_MAX_GROUP_COUNT}`);
+    }
+    if (!Number.isInteger(advanceCount)) {
+      errors.push("Teams advancing per group must be an integer");
+    } else if (
+      (advanceCount as number) < BADMINTON_MIN_ADVANCE_COUNT ||
+      (advanceCount as number) > BADMINTON_MAX_ADVANCE_COUNT
+    ) {
+      errors.push(
+        `Teams advancing per group must be between ${BADMINTON_MIN_ADVANCE_COUNT} and ${BADMINTON_MAX_ADVANCE_COUNT}`,
+      );
+    }
+    if (Number.isInteger(groupCount) && Number.isInteger(advanceCount)) {
+      groupStage = { groupCount: groupCount as number, advanceCount: advanceCount as number };
+    }
+  }
+
   if (errors.length > 0) {
     return { valid: false, errors };
   }
@@ -114,6 +147,7 @@ export function validateBadmintonTournamentInput(input: unknown): {
         data.pointsToWin === undefined || data.pointsToWin === null
           ? BADMINTON_DEFAULT_POINTS_TO_WIN
           : (data.pointsToWin as number),
+      groupStage,
     },
   };
 }

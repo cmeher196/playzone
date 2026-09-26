@@ -51,6 +51,7 @@ export interface BadmintonMatch {
   nextMatchId?: string; // winner advances into this match
   nextSlot?: "A" | "B"; // which side of the next match the winner fills
   isBye?: boolean; // auto-advanced walkover
+  groupId?: string; // set on round-robin matches that belong to a group-stage group
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
@@ -86,8 +87,23 @@ export interface BadmintonTournament {
   teamIds?: string[]; // Badminton team IDs registered for this tournament
   bestOf?: number; // games per match (default 3)
   pointsToWin?: number; // points to win a game (default 21)
+  groupStage?: BadmintonGroupStage; // optional group/pool phase before the knockout
   createdAt: string;
   status: "scheduled" | "live" | "completed";
+}
+
+// A single pool of teams that play a round-robin and produce their own points table.
+export interface BadmintonGroup {
+  id: string; // `${tournamentId}-G1`, `${tournamentId}-G2`, ...
+  name: string; // "Group A", "Group B", ...
+  teamIds: string[]; // registered team IDs placed in this group
+}
+
+export interface BadmintonGroupStage {
+  enabled: boolean;
+  advanceCount: number; // how many teams per group advance to the knockout stage
+  groups: BadmintonGroup[];
+  knockoutGenerated?: boolean; // true once the knockout bracket has been seeded from group results
 }
 
 async function readAll(): Promise<BadmintonTournament[]> {
@@ -120,10 +136,12 @@ export async function createBadmintonTournament(input: {
   pointsToWin?: number;
   organizerId: string;
   organizerName: string;
+  groupStage?: { groupCount: number; advanceCount: number };
 }): Promise<BadmintonTournament> {
   const items = await readAll();
+  const { groupStage, ...rest } = input;
   const tournament: BadmintonTournament = {
-    ...input,
+    ...rest,
     id: nextBadmintonTournamentId(items),
     sport: "badminton",
     courts: [],
@@ -142,6 +160,16 @@ export async function createBadmintonTournament(input: {
       tournamentId: tournament.id,
       createdAt: new Date().toISOString(),
     });
+  }
+
+  // Optional group stage: create the empty groups now; teams are placed later.
+  if (groupStage && groupStage.groupCount >= 2) {
+    tournament.groupStage = {
+      enabled: true,
+      advanceCount: Math.max(1, groupStage.advanceCount),
+      groups: buildEmptyGroups(tournament.id, groupStage.groupCount),
+      knockoutGenerated: false,
+    };
   }
 
   items.push(tournament);
@@ -365,8 +393,484 @@ export async function removeTeamFromBadmintonTournament(
   const tournament = items.find((t) => t.id === tournamentId);
   if (!tournament) return "not-found";
   tournament.teamIds = (tournament.teamIds ?? []).filter((id) => id !== teamId);
+  // Also drop it from any group it was placed in.
+  if (tournament.groupStage) {
+    for (const g of tournament.groupStage.groups) {
+      g.teamIds = g.teamIds.filter((id) => id !== teamId);
+    }
+  }
   await writeAll(items);
   return tournament;
+}
+
+// ===== GROUP STAGE =====
+
+/** Alphabetic group label: 0 -> "Group A", 1 -> "Group B", ... */
+function groupLabel(index: number): string {
+  return index < 26 ? `Group ${String.fromCharCode(65 + index)}` : `Group ${index + 1}`;
+}
+
+/** Builds `count` empty groups with stable ids/names for a tournament. */
+function buildEmptyGroups(tournamentId: string, count: number): BadmintonGroup[] {
+  const groups: BadmintonGroup[] = [];
+  for (let i = 0; i < count; i += 1) {
+    groups.push({ id: `${tournamentId}-G${i + 1}`, name: groupLabel(i), teamIds: [] });
+  }
+  return groups;
+}
+
+/** Next unused group id for a tournament (numbers are never reused after a delete). */
+function nextGroupId(tournament: BadmintonTournament): string {
+  const prefix = `${tournament.id}-G`;
+  const max = (tournament.groupStage?.groups ?? []).reduce((acc, g) => {
+    const n = g.id.startsWith(prefix) ? Number(g.id.slice(prefix.length)) : NaN;
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `${prefix}${max + 1}`;
+}
+
+/** Re-labels groups "Group A", "Group B", … by their current order. */
+function relabelGroups(groups: BadmintonGroup[]): void {
+  groups.forEach((g, i) => {
+    g.name = groupLabel(i);
+  });
+}
+
+/** Evenly spreads the tournament's registered teams across its groups (snake-free round robin). */
+function distributeIntoGroups(tournament: BadmintonTournament, shuffleTeams: boolean): void {
+  const stage = tournament.groupStage;
+  if (!stage || stage.groups.length === 0) return;
+  const teamIds = shuffleTeams ? shuffle(tournament.teamIds ?? []) : [...(tournament.teamIds ?? [])];
+  for (const g of stage.groups) g.teamIds = [];
+  teamIds.forEach((id, i) => {
+    stage.groups[i % stage.groups.length].teamIds.push(id);
+  });
+}
+
+/**
+ * Creates or reconfigures the group stage. Existing team placements are preserved
+ * by group index where possible; `autoDistribute` re-spreads all teams evenly.
+ */
+export async function configureBadmintonGroupStage(
+  tournamentId: string,
+  input: { groupCount: number; advanceCount: number; autoDistribute?: boolean },
+): Promise<BadmintonTournament | "not-found" | "invalid" | "locked"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+
+  const groupCount = Math.floor(input.groupCount);
+  const advanceCount = Math.floor(input.advanceCount);
+  if (!Number.isFinite(groupCount) || groupCount < 2 || groupCount > 16) return "invalid";
+  if (!Number.isFinite(advanceCount) || advanceCount < 1) return "invalid";
+
+  // Don't reshape groups once knockout/group matches carry scores.
+  const stageMatches = tournament.matches.filter((m) => m.groupId || m.round);
+  const hasScores = stageMatches.some((m) => tournament.scoreEvents.some((e) => e.matchId === m.id));
+  if (hasScores) return "locked";
+
+  const registered = new Set(tournament.teamIds ?? []);
+  const existing = tournament.groupStage?.groups ?? [];
+  const groups = buildEmptyGroups(tournament.id, groupCount);
+  for (let i = 0; i < groups.length; i += 1) {
+    const prev = existing[i];
+    if (prev) groups[i].teamIds = prev.teamIds.filter((id) => registered.has(id));
+  }
+
+  tournament.groupStage = { enabled: true, advanceCount, groups, knockoutGenerated: false };
+
+  // Reshaping invalidates any generated matches — drop them so they can be re-created.
+  if (stageMatches.length > 0) {
+    const removed = new Set(stageMatches.map((m) => m.id));
+    tournament.matches = tournament.matches.filter((m) => !removed.has(m.id));
+    tournament.scoreEvents = tournament.scoreEvents.filter((e) => !removed.has(e.matchId));
+  }
+
+  if (input.autoDistribute) distributeIntoGroups(tournament, true);
+
+  await writeAll(items);
+  return tournament;
+}
+
+/** Auto-spreads all registered teams across the groups (optionally reshuffled). */
+export async function distributeBadmintonGroups(
+  tournamentId: string,
+  input: { shuffle?: boolean },
+): Promise<BadmintonTournament | "not-found" | "no-groups" | "locked"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  if (!tournament.groupStage || tournament.groupStage.groups.length === 0) return "no-groups";
+  if (tournament.matches.some((m) => m.groupId)) return "locked";
+  distributeIntoGroups(tournament, !!input.shuffle);
+  await writeAll(items);
+  return tournament;
+}
+
+/** Applies a manual team->group placement. Every team must be registered and used at most once. */
+export async function assignBadmintonGroups(
+  tournamentId: string,
+  assignments: { id: string; teamIds: string[] }[],
+): Promise<BadmintonTournament | "not-found" | "no-groups" | "invalid" | "locked"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage || stage.groups.length === 0) return "no-groups";
+  if (tournament.matches.some((m) => m.groupId)) return "locked";
+
+  const registered = new Set(tournament.teamIds ?? []);
+  const seen = new Set<string>();
+  for (const a of assignments) {
+    for (const teamId of a.teamIds) {
+      if (!registered.has(teamId) || seen.has(teamId)) return "invalid";
+      seen.add(teamId);
+    }
+  }
+
+  const byId = new Map(assignments.map((a) => [a.id, a.teamIds] as const));
+  for (const g of stage.groups) {
+    const next = byId.get(g.id);
+    if (next) g.teamIds = [...next];
+  }
+
+  await writeAll(items);
+  return tournament;
+}
+
+/** Turns the group stage off and removes every group + knockout match it produced. */
+export async function disableBadmintonGroupStage(
+  tournamentId: string,
+): Promise<BadmintonTournament | "not-found"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const removed = new Set(tournament.matches.filter((m) => m.groupId || m.round).map((m) => m.id));
+  tournament.matches = tournament.matches.filter((m) => !removed.has(m.id));
+  tournament.scoreEvents = tournament.scoreEvents.filter((e) => !removed.has(e.matchId));
+  tournament.groupStage = undefined;
+  await writeAll(items);
+  return tournament;
+}
+
+/** Appends one empty group (max 16). Locked once group matches exist. */
+export async function addBadmintonGroup(
+  tournamentId: string,
+): Promise<BadmintonTournament | "not-found" | "no-groups" | "locked" | "invalid"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage) return "no-groups";
+  if (tournament.matches.some((m) => m.groupId)) return "locked";
+  if (stage.groups.length >= 16) return "invalid";
+  stage.groups.push({ id: nextGroupId(tournament), name: "", teamIds: [] });
+  relabelGroups(stage.groups);
+  await writeAll(items);
+  return tournament;
+}
+
+/** Removes a group; any teams in it become unassigned. Locked once group matches exist. */
+export async function removeBadmintonGroup(
+  tournamentId: string,
+  groupId: string,
+): Promise<BadmintonTournament | "not-found" | "no-groups" | "locked"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage) return "no-groups";
+  if (tournament.matches.some((m) => m.groupId)) return "locked";
+  stage.groups = stage.groups.filter((g) => g.id !== groupId);
+  relabelGroups(stage.groups);
+  await writeAll(items);
+  return tournament;
+}
+
+/** Sets how many teams advance per group (used by the next knockout draw). */
+export async function setBadmintonGroupAdvanceCount(
+  tournamentId: string,
+  advanceCount: number,
+): Promise<BadmintonTournament | "not-found" | "no-groups" | "invalid"> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage) return "no-groups";
+  const n = Math.floor(advanceCount);
+  if (!Number.isFinite(n) || n < 1) return "invalid";
+  stage.advanceCount = n;
+  await writeAll(items);
+  return tournament;
+}
+
+/** Sequential BDM-### id generator seeded from the highest existing match number. */
+function makeMatchIdGenerator(matches: BadmintonMatch[]): () => string {
+  let max = matches.reduce((acc, m) => {
+    const parsed = /^BDM-(\d+)$/.exec(m.id);
+    const n = parsed ? Number(parsed[1]) : 0;
+    return n > acc ? n : acc;
+  }, 0);
+  return () => {
+    max += 1;
+    return `BDM-${String(max).padStart(3, "0")}`;
+  };
+}
+
+/** Generates round-robin matches inside every group (each team plays the others once). */
+export async function generateGroupStageMatches(
+  tournamentId: string,
+  input: { reset?: boolean },
+): Promise<
+  | { created: number }
+  | "not-found"
+  | "no-groups"
+  | "no-courts"
+  | "not-enough-teams"
+  | "already-exists"
+> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage || stage.groups.length === 0) return "no-groups";
+  if (tournament.courts.length === 0) return "no-courts";
+
+  if (tournament.matches.some((m) => m.groupId) && !input.reset) return "already-exists";
+  if (input.reset) {
+    const removed = new Set(tournament.matches.filter((m) => m.groupId || m.round).map((m) => m.id));
+    tournament.matches = tournament.matches.filter((m) => !removed.has(m.id));
+    tournament.scoreEvents = tournament.scoreEvents.filter((e) => !removed.has(e.matchId));
+    stage.knockoutGenerated = false;
+  }
+
+  const teamIdsInGroups = stage.groups.flatMap((g) => g.teamIds);
+  if (teamIdsInGroups.length < 2) return "not-enough-teams";
+
+  const teamList = await Promise.all(teamIdsInGroups.map((id) => getBadmintonTeam(id)));
+  const teamMap = new Map<string, BadmintonTeam>();
+  teamIdsInGroups.forEach((id, i) => {
+    const t = teamList[i];
+    if (t) teamMap.set(id, t);
+  });
+
+  const nextId = makeMatchIdGenerator(tournament.matches);
+  const now = new Date().toISOString();
+  let courtIdx = 0;
+  const created: BadmintonMatch[] = [];
+
+  for (const group of stage.groups) {
+    const ids = group.teamIds.filter((id) => teamMap.has(id));
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const teamA = teamMap.get(ids[i])!;
+        const teamB = teamMap.get(ids[j])!;
+        const aPlayers = teamA.playerIds.filter(Boolean);
+        const bPlayers = teamB.playerIds.filter(Boolean);
+        if (aPlayers.length === 0 || bPlayers.length === 0) continue;
+        const format: BadmintonMatchFormat = aPlayers.length === 2 && bPlayers.length === 2 ? "doubles" : "singles";
+        const court = tournament.courts[courtIdx % tournament.courts.length];
+        courtIdx += 1;
+        created.push({
+          id: nextId(),
+          courtId: court.id,
+          tournamentId: tournament.id,
+          format,
+          playerA: aPlayers[0],
+          playerB: bPlayers[0],
+          playerC: format === "doubles" ? aPlayers[1] : undefined,
+          playerD: format === "doubles" ? bPlayers[1] : undefined,
+          teamAId: teamA.id,
+          teamBId: teamB.id,
+          teamAName: teamA.name,
+          teamBName: teamB.name,
+          groupId: group.id,
+          status: "scheduled",
+          games: blankGames(tournament.bestOf ?? 3),
+          currentGameIndex: 0,
+          createdAt: now,
+        });
+      }
+    }
+  }
+
+  if (created.length === 0) return "not-enough-teams";
+  tournament.matches.push(...created);
+  await writeAll(items);
+  return { created: created.length };
+}
+
+/** An entrant seeded into a knockout bracket (a team, carrying its roster). */
+interface Entrant {
+  teamId?: string;
+  teamName?: string;
+  players: string[];
+}
+
+/**
+ * Builds a single-elimination bracket for the given seeded entrants (index 0 = top seed).
+ * Returns detached match objects (not yet attached to the tournament) plus the round count.
+ */
+function buildKnockoutBracket(
+  tournament: BadmintonTournament,
+  entrants: Entrant[],
+  format: BadmintonMatchFormat,
+  nextId: () => string,
+  now: string,
+): { matches: BadmintonMatch[]; rounds: number } {
+  const bracketSize = nextPow2(entrants.length);
+  const rounds = Math.log2(bracketSize);
+  const order = seedOrder(bracketSize);
+
+  const grid: BadmintonMatch[][] = [];
+  let courtIdx = 0;
+  for (let r = 0; r < rounds; r += 1) {
+    const count = bracketSize / 2 ** (r + 1);
+    grid[r] = [];
+    for (let i = 0; i < count; i += 1) {
+      const court = tournament.courts[courtIdx % tournament.courts.length];
+      courtIdx += 1;
+      grid[r].push({
+        id: nextId(),
+        courtId: court.id,
+        tournamentId: tournament.id,
+        format,
+        playerA: "",
+        playerB: "",
+        status: "scheduled",
+        round: knockoutRoundName(rounds - r),
+        games: blankGames(tournament.bestOf ?? 3),
+        currentGameIndex: 0,
+        createdAt: now,
+      });
+    }
+  }
+
+  for (let r = 0; r < rounds - 1; r += 1) {
+    for (let i = 0; i < grid[r].length; i += 1) {
+      const next = grid[r + 1][Math.floor(i / 2)];
+      grid[r][i].nextMatchId = next.id;
+      grid[r][i].nextSlot = i % 2 === 0 ? "A" : "B";
+    }
+  }
+
+  const place = (m: BadmintonMatch, slot: "A" | "B", e: Entrant | undefined) => {
+    if (!e) return;
+    if (slot === "A") {
+      m.playerA = e.players[0] ?? "";
+      if (format === "doubles") m.playerC = e.players[1];
+      m.teamAId = e.teamId;
+      m.teamAName = e.teamName;
+    } else {
+      m.playerB = e.players[0] ?? "";
+      if (format === "doubles") m.playerD = e.players[1];
+      m.teamBId = e.teamId;
+      m.teamBName = e.teamName;
+    }
+  };
+
+  for (let i = 0; i < grid[0].length; i += 1) {
+    place(grid[0][i], "A", entrants[order[i * 2] - 1]);
+    place(grid[0][i], "B", entrants[order[i * 2 + 1] - 1]);
+  }
+
+  const flat = grid.flat();
+  const byId = new Map(flat.map((m) => [m.id, m] as const));
+
+  // Cascade byes: a slot with exactly one entrant auto-advances that entrant.
+  for (let r = 0; r < rounds; r += 1) {
+    for (const m of grid[r]) {
+      if (m.status !== "scheduled") continue;
+      const hasA = !!m.playerA;
+      const hasB = !!m.playerB;
+      if (hasA === hasB) continue;
+      m.status = "completed";
+      m.matchWinner = hasA ? "playerA" : "playerB";
+      m.isBye = true;
+      m.completedAt = now;
+      const next = m.nextMatchId ? byId.get(m.nextMatchId) : undefined;
+      if (next && m.nextSlot) {
+        const e: Entrant = hasA
+          ? { teamId: m.teamAId, teamName: m.teamAName, players: [m.playerA, ...(m.playerC ? [m.playerC] : [])] }
+          : { teamId: m.teamBId, teamName: m.teamBName, players: [m.playerB, ...(m.playerD ? [m.playerD] : [])] };
+        place(next, m.nextSlot, e);
+      }
+    }
+  }
+
+  return { matches: flat, rounds };
+}
+
+/**
+ * Seeds a knockout bracket from the group standings: the top `advanceCount` teams
+ * of every group qualify (group winners seeded above runners-up, cross-group so a
+ * group's own teams avoid meeting in the first round).
+ */
+export async function generateKnockoutFromGroups(
+  tournamentId: string,
+  input: { reset?: boolean },
+): Promise<
+  | { created: number; rounds: number }
+  | "not-found"
+  | "no-groups"
+  | "no-courts"
+  | "group-stage-missing"
+  | "group-stage-incomplete"
+  | "not-enough-teams"
+  | "already-exists"
+> {
+  const items = await readAll();
+  const tournament = items.find((t) => t.id === tournamentId);
+  if (!tournament) return "not-found";
+  const stage = tournament.groupStage;
+  if (!stage || stage.groups.length === 0) return "no-groups";
+  if (tournament.courts.length === 0) return "no-courts";
+
+  const groupMatches = tournament.matches.filter((m) => m.groupId);
+  if (groupMatches.length === 0) return "group-stage-missing";
+  if (!groupMatches.every((m) => m.status === "completed")) return "group-stage-incomplete";
+
+  if (tournament.matches.some((m) => m.round && !m.groupId) && !input.reset) return "already-exists";
+  if (input.reset) {
+    const removed = new Set(tournament.matches.filter((m) => m.round && !m.groupId).map((m) => m.id));
+    tournament.matches = tournament.matches.filter((m) => !removed.has(m.id));
+    tournament.scoreEvents = tournament.scoreEvents.filter((e) => !removed.has(e.matchId));
+  }
+
+  // Winners first (rank 0 across all groups), then runners-up, and so on.
+  const advanceCount = Math.max(1, stage.advanceCount);
+  const perGroup = stage.groups.map((g) => computeBadmintonGroupStandings(tournament, g.id));
+  const qualifierIds: string[] = [];
+  for (let rank = 0; rank < advanceCount; rank += 1) {
+    for (const rows of perGroup) {
+      const q = rows[rank];
+      if (q && q.teamId) qualifierIds.push(q.teamId);
+    }
+  }
+  if (qualifierIds.length < 2) return "not-enough-teams";
+
+  const teamList = await Promise.all(qualifierIds.map((id) => getBadmintonTeam(id)));
+  const entrants: Entrant[] = [];
+  qualifierIds.forEach((id, i) => {
+    const t = teamList[i];
+    if (t) entrants.push({ teamId: t.id, teamName: t.name, players: t.playerIds.filter(Boolean) });
+  });
+  if (entrants.length < 2) return "not-enough-teams";
+
+  const format: BadmintonMatchFormat = entrants[0].players.length >= 2 ? "doubles" : "singles";
+  const nextId = makeMatchIdGenerator(tournament.matches);
+  const { matches: bracket, rounds } = buildKnockoutBracket(
+    tournament,
+    entrants,
+    format,
+    nextId,
+    new Date().toISOString(),
+  );
+
+  tournament.matches.push(...bracket);
+  stage.knockoutGenerated = true;
+  await writeAll(items);
+  return { created: bracket.length, rounds };
 }
 
 /** Randomly seeds participants into a single-elimination knockout bracket. */
@@ -490,16 +994,22 @@ function advanceWinnerToNext(tournament: BadmintonTournament, match: BadmintonMa
   if (!match.nextMatchId || !match.nextSlot || !match.matchWinner) return;
   const next = tournament.matches.find((m) => m.id === match.nextMatchId);
   if (!next) return;
-  const winners =
-    match.matchWinner === "playerA"
-      ? [match.playerA, ...(match.playerC ? [match.playerC] : [])]
-      : [match.playerB, ...(match.playerD ? [match.playerD] : [])];
+  const winA = match.matchWinner === "playerA";
+  const winners = winA
+    ? [match.playerA, ...(match.playerC ? [match.playerC] : [])]
+    : [match.playerB, ...(match.playerD ? [match.playerD] : [])];
+  const teamId = winA ? match.teamAId : match.teamBId;
+  const teamName = winA ? match.teamAName : match.teamBName;
   if (match.nextSlot === "A") {
     next.playerA = winners[0] ?? "";
     if (winners[1]) next.playerC = winners[1];
+    next.teamAId = teamId;
+    next.teamAName = teamName;
   } else {
     next.playerB = winners[0] ?? "";
     if (winners[1]) next.playerD = winners[1];
+    next.teamBId = teamId;
+    next.teamBName = teamName;
   }
 }
 
@@ -511,9 +1021,13 @@ function clearWinnerFromNext(tournament: BadmintonTournament, match: BadmintonMa
   if (match.nextSlot === "A") {
     next.playerA = "";
     next.playerC = undefined;
+    next.teamAId = undefined;
+    next.teamAName = undefined;
   } else {
     next.playerB = "";
     next.playerD = undefined;
+    next.teamBId = undefined;
+    next.teamBName = undefined;
   }
 }
 
@@ -1093,6 +1607,84 @@ export function computeBadmintonStandings(tournament: BadmintonTournament): Badm
       r.pointsAgainst += pointsA;
       if (m.matchWinner === "playerB") r.won += 1;
       else r.lost += 1;
+    }
+  }
+
+  return [...rows.values()].sort(
+    (a, b) =>
+      b.won - a.won ||
+      b.gamesWon - b.gamesLost - (a.gamesWon - a.gamesLost) ||
+      b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst) ||
+      b.pointsFor - a.pointsFor,
+  );
+}
+
+export interface BadmintonTeamStandingRow {
+  teamId: string;
+  played: number;
+  won: number;
+  lost: number;
+  gamesWon: number;
+  gamesLost: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
+/**
+ * Per-team points table for a single group, built from that group's completed
+ * round-robin matches. Every team in the group is listed even before it plays.
+ */
+export function computeBadmintonGroupStandings(
+  tournament: BadmintonTournament,
+  groupId: string,
+): BadmintonTeamStandingRow[] {
+  const group = tournament.groupStage?.groups.find((g) => g.id === groupId);
+  if (!group) return [];
+
+  const rows = new Map<string, BadmintonTeamStandingRow>();
+  const row = (id: string): BadmintonTeamStandingRow => {
+    let r = rows.get(id);
+    if (!r) {
+      r = { teamId: id, played: 0, won: 0, lost: 0, gamesWon: 0, gamesLost: 0, pointsFor: 0, pointsAgainst: 0 };
+      rows.set(id, r);
+    }
+    return r;
+  };
+  for (const id of group.teamIds) row(id);
+
+  for (const m of tournament.matches) {
+    if (m.groupId !== groupId || m.status !== "completed" || m.isBye || !m.matchWinner) continue;
+    if (!m.teamAId || !m.teamBId) continue;
+
+    let gamesA = 0;
+    let gamesB = 0;
+    let pointsA = 0;
+    let pointsB = 0;
+    for (const g of m.games) {
+      pointsA += g.playerAScore;
+      pointsB += g.playerBScore;
+      if (g.winner === "playerA") gamesA += 1;
+      else if (g.winner === "playerB") gamesB += 1;
+    }
+
+    const a = row(m.teamAId);
+    const b = row(m.teamBId);
+    a.played += 1;
+    b.played += 1;
+    a.gamesWon += gamesA;
+    a.gamesLost += gamesB;
+    b.gamesWon += gamesB;
+    b.gamesLost += gamesA;
+    a.pointsFor += pointsA;
+    a.pointsAgainst += pointsB;
+    b.pointsFor += pointsB;
+    b.pointsAgainst += pointsA;
+    if (m.matchWinner === "playerA") {
+      a.won += 1;
+      b.lost += 1;
+    } else {
+      b.won += 1;
+      a.lost += 1;
     }
   }
 

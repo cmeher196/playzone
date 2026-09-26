@@ -10,6 +10,9 @@ export function BadmintonTournamentForm() {
   const [courtCount, setCourtCount] = useState(2);
   const [bestOf, setBestOf] = useState(3);
   const [pointsToWin, setPointsToWin] = useState(21);
+  const [enableGroups, setEnableGroups] = useState(false);
+  const [groupCount, setGroupCount] = useState(4);
+  const [advanceCount, setAdvanceCount] = useState(2);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -29,6 +32,11 @@ export function BadmintonTournamentForm() {
           courtCount: parseInt(courtCount.toString()),
           bestOf: Math.max(1, Math.min(15, Number.isFinite(bestOf) ? bestOf : 3)),
           pointsToWin: Math.max(5, Math.min(99, Number.isFinite(pointsToWin) ? pointsToWin : 21)),
+          enableGroups,
+          groupCount: enableGroups
+            ? Math.max(2, Math.min(16, Number.isFinite(groupCount) ? groupCount : 4))
+            : undefined,
+          advanceCount: enableGroups ? advanceCount : undefined,
         }),
       });
 
@@ -143,6 +151,60 @@ export function BadmintonTournamentForm() {
       </div>
 
       {error && <p className="text-sm text-rose-300">{error}</p>}
+
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={enableGroups}
+            onChange={(e) => setEnableGroups(e.target.checked)}
+            className="mt-1 h-4 w-4 accent-emerald-400"
+          />
+          <span>
+            <span className="block text-sm font-medium text-white">Group stage</span>
+            <span className="block text-xs text-white/50">
+              Split teams into groups that each play a round-robin with their own points table. Top
+              finishers advance to a knockout. You can add teams and shuffle groups after creating.
+            </span>
+          </span>
+        </label>
+
+        {enableGroups && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm text-white/70">Number of groups</label>
+              <input
+                type="number"
+                min={2}
+                max={16}
+                value={Number.isNaN(groupCount) ? "" : groupCount}
+                onChange={(e) => setGroupCount(e.target.valueAsNumber)}
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-emerald-400/50"
+              />
+              <p className="mt-1 text-xs text-white/50">Any number from 2–16. You can add or remove groups later.</p>
+            </div>
+            <div>
+              <label className="block text-sm text-white/70">Advance per group</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[1, 2].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setAdvanceCount(count)}
+                    className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      advanceCount === count
+                        ? "bg-emerald-400 text-emerald-950"
+                        : "border border-white/10 bg-white/5 text-white hover:border-emerald-400/50"
+                    }`}
+                  >
+                    Top {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <button
         disabled={saving || !name.trim()}
