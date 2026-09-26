@@ -514,11 +514,11 @@ OTP_SECRET=
 ADMIN_MOBILE=
 ADMIN_PASSWORD=
 ADMIN_NAME=
-NEXT_PUBLIC_LEAGUE_NAME=SMPL
-NEXT_PUBLIC_LEAGUE_FULL_NAME=SMPL Cricket League
+NEXT_PUBLIC_LEAGUE_NAME=PlaySome
+NEXT_PUBLIC_LEAGUE_FULL_NAME=PlaySome
 NEXT_PUBLIC_REG_FEE=500
 NEXT_PUBLIC_UPI_ID=
-NEXT_PUBLIC_UPI_PAYEE_NAME=SMPL Cricket League
+NEXT_PUBLIC_UPI_PAYEE_NAME=PlaySome
 ```
 
 Development behavior:
@@ -526,6 +526,10 @@ Development behavior:
 - Without `MONGODB_URI`, local JSON storage is used.
 - Without admin variables, development admin defaults are used by the current implementation.
 - Without `AUTH_SECRET` or `OTP_SECRET`, a development fallback secret is used. A production deployment must set a strong secret.
+
+### 15.1 League Branding
+
+`NEXT_PUBLIC_LEAGUE_NAME` and `NEXT_PUBLIC_LEAGUE_FULL_NAME` (default `PlaySome`, see `src/lib/config.ts`) are the single source of truth for league branding shown throughout registration, onboarding, rankings, and player stats copy (e.g. the registration welcome message, the success screen, "{league} Rankings", "{league} Rating"). Sequential player ids (`PlaySome-A001`, …) are also derived from this value via `ID_PREFIX` in `src/lib/registrations.ts`, and the exported `PLAYER_ID_PATTERN` from that module is the shared regex other modules (e.g. badminton) must use to validate player ids — no module should hardcode the league prefix or a literal brand string in registration/onboarding copy. The overall app/product name (`CricArena`, `appConfig.appName`) is a separate, unrelated brand string and is out of scope for league-name changes.
 
 ## 16. Commands
 

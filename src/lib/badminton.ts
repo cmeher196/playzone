@@ -5,12 +5,12 @@ import {
   undoBadmintonPoint,
   type BadmintonEventType,
   type BadmintonParticipant,
-  type BadmintonPointEvent,
   type BadmintonRules,
   type BadmintonScoreState,
   DEFAULT_BADMINTON_RULES,
 } from "./badminton-scoring";
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { PLAYER_ID_PATTERN } from "./registrations";
 
 export type BadmintonFormat = "knockout" | "round-robin" | "group-knockout";
 export type BadmintonStatus = "draft" | "registration-open" | "registration-closed" | "in-progress" | "completed" | "cancelled";
@@ -43,8 +43,8 @@ async function readAll(): Promise<BadmintonTournament[]> {
       ...tournament,
       scorerIds: [...new Set([tournament.organizerId, ...(tournament.scorerIds ?? [])])],
       events,
-      // Older UI versions allowed blank IDs and phone numbers here. Shared player IDs are SMPL IDs.
-      players: (tournament.players ?? []).filter((player) => /^SMPL-[A-Z]\d{3}$/.test(player.id) && player.name.trim().length > 0),
+      // Older UI versions allowed blank IDs and phone numbers here. Shared player IDs follow PLAYER_ID_PATTERN.
+      players: (tournament.players ?? []).filter((player) => PLAYER_ID_PATTERN.test(player.id) && player.name.trim().length > 0),
       };
     });
 }
@@ -60,6 +60,7 @@ export async function createBadmintonTournament(input: Omit<BadmintonTournament,
   const eventLabels: Record<string, string> = { "mens-singles": "Men's Singles", "womens-singles": "Women's Singles", "mens-doubles": "Men's Doubles", "womens-doubles": "Women's Doubles", "mixed-doubles": "Mixed Doubles" };
   const events = eventTypes.map((type, index) => ({ id: `BE-${String(index + 1).padStart(3, "0")}`, name: eventLabels[type] ?? type, type, rules: DEFAULT_BADMINTON_RULES, participantIds: [] }));
   const { eventTypes: _, ...tournamentInput } = input;
+  void _; // intentionally dropped from tournamentInput below
   const tournament: BadmintonTournament = { ...tournamentInput, id: nextId("BT", items.map((item) => item.id)), status: "draft", scorerIds: [input.organizerId], players: [], pairs: [], events, matches: [], audit: [], createdAt: new Date().toISOString() };
   audit(tournament, input.organizerId, "tournament.created"); items.push(tournament); await writeAll(items); return tournament;
 }
@@ -78,7 +79,7 @@ export async function addBadmintonEvent(id: string, event: Omit<BadmintonEvent, 
 }
 export async function registerBadmintonPlayer(id: string, player: BadmintonPlayer, userId: string) {
   const items = await readAll(); const t = items.find((item) => item.id === id); if (!t) return undefined;
-  if (!/^SMPL-[A-Z]\d{3}$/.test(player.id) || !player.name.trim()) throw new Error("Choose a registered player from the list");
+  if (!PLAYER_ID_PATTERN.test(player.id) || !player.name.trim()) throw new Error("Choose a registered player from the list");
   if (!t.players.some((item) => item.id === player.id)) t.players.push(player); audit(t, userId, "player.registered", undefined, player); await writeAll(items); return t;
 }
 export async function createBadmintonPair(id: string, pair: Omit<BadmintonPair, "id">, userId: string) {

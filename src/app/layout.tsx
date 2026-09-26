@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { appConfig } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,9 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CricArena — SMPL Player Registration",
-  description:
-    "Register for the SMPL cricket league: enter your details, pay the fee via UPI, and lock your spot.",
+  title: `${appConfig.appName} — ${appConfig.leagueName} Player Registration`,
+  description: `Register for ${appConfig.leagueName}: enter your details, pay the fee via UPI, and lock your spot.`,
 };
 
 // Runs before paint so the saved theme is applied without a flash of the wrong colors.

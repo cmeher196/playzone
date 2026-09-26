@@ -6,6 +6,7 @@ import { battingPoints, bowlingPoints } from "@/lib/rating";
 import { removeDemoData } from "@/lib/demo-data";
 import { DashboardShell } from "@/components/DashboardShell";
 import { isAdmin } from "@/lib/admin";
+import { appConfig } from "@/lib/config";
 
 type Row = { id: string; name: string; value: string | number; sub?: string };
 
@@ -107,7 +108,7 @@ export default async function RankingsPage() {
   return (
     <DashboardShell userName={user.name} isAdmin={isAdmin(user)}>
       <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight">SMPL Rankings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{appConfig.leagueName} Rankings</h1>
         <p className="mt-1 text-sm text-white/50">
           Season leaderboards across every completed match.
         </p>

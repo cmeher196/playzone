@@ -83,11 +83,18 @@ export async function addRegistration(
   return record;
 }
 
-// Sequential, human-friendly IDs: SMPL-A001 … SMPL-A999, then SMPL-B001 … up to
-// SMPL-Z999 (25,974 total). Legacy IDs that don't match are ignored, so
-// numbering starts fresh at A001.
+// Sequential, human-friendly IDs: e.g. PlaySome-A001 … PlaySome-A999, then
+// PlaySome-B001 … up to PlaySome-Z999 (25,974 total), prefixed with the
+// configured league name (see src/lib/config.ts — never hardcode the prefix
+// elsewhere). Legacy IDs that don't match are ignored, so numbering starts
+// fresh at A001.
 const ID_PREFIX = appConfig.leagueName;
 const SEQ_ID_RE = new RegExp(`^${ID_PREFIX}-([A-Z])(\\d{3})$`);
+
+/** Matches a well-formed player id for the configured league (e.g.
+ * "PlaySome-A001"). Exported so other modules (e.g. badminton.ts) can
+ * validate shared player ids without duplicating the league prefix. */
+export const PLAYER_ID_PATTERN = new RegExp(`^${ID_PREFIX}-[A-Z]\\d{3}$`);
 
 function ordinalFromId(id: string): number | null {
   const match = SEQ_ID_RE.exec(id);
@@ -105,7 +112,7 @@ function nextRegistrationId(records: RegistrationRecord[]): string {
   const n = maxOrdinal + 1;
   const letterIndex = Math.floor((n - 1) / 999);
   if (letterIndex > 25) {
-    throw new Error("Registration ID capacity exhausted (SMPL-A001…SMPL-Z999).");
+    throw new Error(`Registration ID capacity exhausted (${ID_PREFIX}-A001…${ID_PREFIX}-Z999).`);
   }
   const number = ((n - 1) % 999) + 1;
   const letter = String.fromCharCode(65 + letterIndex);
@@ -133,7 +140,7 @@ export async function deleteRecord(id: string): Promise<boolean> {
 /**
  * Ensures an admin account exists. A record matching the mobile is promoted to
  * admin (and given a password if it lacked one); otherwise a dedicated
- * SMPL-ADMIN account is created.
+ * `${ID_PREFIX}-ADMIN` account is created.
  */
 export async function ensureAdminAccount(params: {
   mobile: string;

@@ -12,6 +12,7 @@ import {
   BATTING_HANDS,
   BOWLING_STYLES,
 } from "@/lib/validation";
+import { appConfig } from "@/lib/config";
 
 const PLAYER_TYPE_ICONS: Record<(typeof PLAYER_TYPES)[number], string> = {
   Batsman: "🏏",
@@ -344,8 +345,9 @@ function SuccessCard({
       </div>
       <h2 className="text-2xl font-bold text-white">You&apos;re registered!</h2>
       <p className="mt-2 text-white/60">
-        Welcome aboard{firstName ? `, ${firstName}` : ""}! Your spot is
-        confirmed.
+        Welcome to {appConfig.leagueName}{firstName ? `, ${firstName}` : ""}! Your
+        profile has been created successfully and you&apos;re ready to explore
+        matches and tournaments.
       </p>
       <div className="mt-6 w-full rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="text-[11px] uppercase tracking-wide text-white/40">

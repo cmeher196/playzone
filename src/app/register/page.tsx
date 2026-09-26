@@ -10,7 +10,7 @@ export default async function RegisterPage({
 }) {
   const { next } = await searchParams;
   const redirectTo = next?.startsWith("/join/") ? next : "/profile";
-  const { appName, leagueName, leagueFullName } = appConfig;
+  const { appName, leagueName } = appConfig;
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[var(--page-bg)] text-white">
@@ -31,7 +31,7 @@ export default async function RegisterPage({
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Player Registration</h1>
           <p className="mx-auto mt-2 max-w-md text-white/60">
-            Join <span className="text-white">{leagueFullName}</span>. Create your player profile, then find tournaments to play.
+            Welcome to <span className="text-white">{leagueName}</span>! Create your player profile, discover tournaments, and start playing cricket.
           </p>
         </header>
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 shadow-2xl shadow-black/40 backdrop-blur sm:p-7">

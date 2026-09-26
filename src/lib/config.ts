@@ -8,12 +8,12 @@
 export const appConfig = {
   appName: "CricArena",
   tagline: "Your Ground. Your Game.",
-  leagueName: process.env.NEXT_PUBLIC_LEAGUE_NAME ?? "SMPL",
-  leagueFullName: process.env.NEXT_PUBLIC_LEAGUE_FULL_NAME ?? "SMPL Cricket League",
+  leagueName: process.env.NEXT_PUBLIC_LEAGUE_NAME ?? "PlaySome",
+  leagueFullName: process.env.NEXT_PUBLIC_LEAGUE_FULL_NAME ?? "PlaySome",
   currencySymbol: "₹",
   registrationFee: Number(process.env.NEXT_PUBLIC_REG_FEE ?? 300),
   upi: {
     id: process.env.NEXT_PUBLIC_UPI_ID ?? "your-vpa@bank",
-    payeeName: process.env.NEXT_PUBLIC_UPI_PAYEE_NAME ?? "SMPL Cricket League",
+    payeeName: process.env.NEXT_PUBLIC_UPI_PAYEE_NAME ?? "PlaySome",
   },
 } as const;

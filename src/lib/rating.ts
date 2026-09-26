@@ -1,9 +1,9 @@
 import type { PlayerStats } from "./stats";
 
 /**
- * SMPL points & rating — a lightweight, transparent scoring model derived from
- * a player's aggregated match stats. Pure functions (no I/O) so they are safe
- * to use on the client too.
+ * League points & rating — a lightweight, transparent scoring model derived
+ * from a player's aggregated match stats. Pure functions (no I/O) so they
+ * are safe to use on the client too.
  */
 export function computePoints(s: PlayerStats): number {
   const batting = s.runs + s.fours + s.sixes * 2;

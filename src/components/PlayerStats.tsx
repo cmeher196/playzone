@@ -1,5 +1,6 @@
 import type { PlayerStats } from "@/lib/stats";
 import { ratingTier } from "@/lib/rating";
+import { appConfig } from "@/lib/config";
 
 export function PlayerRatingCard({
   points,
@@ -16,7 +17,7 @@ export function PlayerRatingCard({
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-[11px] uppercase tracking-wide text-white/40">
-            SMPL Rating
+            {appConfig.leagueName} Rating
           </div>
           <div className="mt-1 flex items-center gap-2">
             <span className="text-3xl font-bold text-emerald-300">{ppm}</span>
