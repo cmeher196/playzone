@@ -253,6 +253,9 @@ export const chatMessageSchema = z.object({
   text: z.string().trim().min(1, "Write a message.").max(500, "Messages can be at most 500 characters."),
 });
 
+// The toss is optional at creation time — a match may be scheduled well
+// ahead of when it actually starts, so it's decided then instead (see
+// matchTossSchema / setMatchToss).
 export const matchCreateSchema = z
   .object({
     teamAId: z.string().min(1, "Select the first team"),
@@ -264,8 +267,8 @@ export const matchCreateSchema = z
       .max(50, "Max 50 overs"),
     venue: z.string().trim().max(120, "Venue is too long").optional(),
     date: z.string().min(1, "Pick a date"),
-    tossWinnerId: z.string().min(1, "Select the toss winner"),
-    tossDecision: z.enum(["bat", "bowl"], { error: "Choose bat or bowl" }),
+    tossWinnerId: z.string().min(1).optional(),
+    tossDecision: z.enum(["bat", "bowl"], { error: "Choose bat or bowl" }).optional(),
     teamAPlayerIds: z.array(z.string().min(1)).min(2, "Select at least two Team A players"),
     teamBPlayerIds: z.array(z.string().min(1)).min(2, "Select at least two Team B players"),
   })
@@ -274,6 +277,12 @@ export const matchCreateSchema = z
     path: ["teamBId"],
   });
 export type MatchCreateInput = z.infer<typeof matchCreateSchema>;
+
+export const matchTossSchema = z.object({
+  tossWinnerId: z.string().min(1, "Select the toss winner"),
+  tossDecision: z.enum(["bat", "bowl"], { error: "Choose bat or bowl" }),
+});
+export type MatchTossInput = z.infer<typeof matchTossSchema>;
 
 export const scoreEventSchema = z.discriminatedUnion("t", [
   z.object({

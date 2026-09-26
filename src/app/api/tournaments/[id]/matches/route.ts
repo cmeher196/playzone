@@ -108,6 +108,7 @@ export async function POST(
     );
   }
   if (
+    parsed.data.tossWinnerId &&
     parsed.data.tossWinnerId !== teamA.id &&
     parsed.data.tossWinnerId !== teamB.id
   ) {

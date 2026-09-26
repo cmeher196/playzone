@@ -704,10 +704,9 @@ function ProgressPanel({
 }
 
 function InfoPanel({ match, live }: { match: LiveMatch; live: ComputedMatch }) {
-  const tossWinner =
-    match.toss.winnerTeamId === match.teamA.teamId
-      ? match.teamA.name
-      : match.teamB.name;
+  const tossLabel = match.toss
+    ? `${match.toss.winnerTeamId === match.teamA.teamId ? match.teamA.name : match.teamB.name} won the toss and chose to ${match.toss.decision}`
+    : "To be decided when the match starts";
   const statusLabel =
     match.status === "completed"
       ? "Completed"
@@ -717,7 +716,7 @@ function InfoPanel({ match, live }: { match: LiveMatch; live: ComputedMatch }) {
   const rows: [string, string][] = [
     ["Match", `${match.teamA.name} vs ${match.teamB.name}`],
     ["Format", `${match.overs} overs a side`],
-    ["Toss", `${tossWinner} won the toss and chose to ${match.toss.decision}`],
+    ["Toss", tossLabel],
     ["Venue", match.venue || "—"],
     ["Date & Time", fmtDate(match.date)],
     ["Status", statusLabel],

@@ -80,7 +80,9 @@ export interface LiveMatch {
   overs: number;
   venue?: string;
   date: string;
-  toss: { winnerTeamId: string; decision: Decision };
+  /** Undecided until the match actually starts — not required at creation
+   * time since a scheduled match may not begin play right away. */
+  toss?: { winnerTeamId: string; decision: Decision };
   status: "scheduled" | "live" | "completed";
   innings: StoredInnings[];
   currentInnings: number;

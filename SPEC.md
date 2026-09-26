@@ -207,12 +207,13 @@ Most authenticated pages use `DashboardShell`, which provides:
 5. If an entry fee applies, the player uses the configured UPI details and submits a UTR/reference value.
 6. The organizer creates teams and adds players.
 7. The organizer creates tournament-backed matches.
-8. The organizer selects two teams, overs, date, venue, toss winner, and toss decision.
+8. The organizer selects two teams, overs, date, and venue. The toss is **not** decided at this point — many matches are scheduled ahead of when they'll actually start.
 9. The match opens in scorer mode.
-10. The scorer records ball-by-ball events.
-11. The system derives scores, wickets, overs, batsman cards, bowler cards, extras, commentary, and result data from the event log.
-12. The scorer completes the match.
-13. Completed match data is added to the tournament scorecard history and feeds performance/ranking calculations where supported.
+10. Before any ball-by-ball events can be recorded, the scorer conducts the toss (toss-winning team and bat/bowl decision) via `POST /api/matches/[matchId]/toss`; this determines which side bats first in the first innings.
+11. The scorer records ball-by-ball events.
+12. The system derives scores, wickets, overs, batsman cards, bowler cards, extras, commentary, and result data from the event log.
+13. The scorer completes the match.
+14. Completed match data is added to the tournament scorecard history and feeds performance/ranking calculations where supported.
 
 ## 7. Matches
 
@@ -245,9 +246,8 @@ The existing form supports:
 - Overs per side.
 - Match date.
 - Venue.
-- Toss winner.
-- Toss decision: bat or bowl.
-- Virtual coin toss: the toss stays disabled until both teams have at least two players. The user then selects which team calls the toss, that team chooses Heads or Tails, the other team receives the opposite side, and clicking the coin runs an in-air animation before revealing the random result.
+
+The toss is intentionally **not** collected here — see §8 below. This lets an organizer schedule a match without needing to know who'll actually be present to call the toss when it starts.
 
 The form posts to `POST /api/tournaments/[id]/matches` and redirects to `/matches/[matchId]`.
 
@@ -258,20 +258,9 @@ Route: `/matches/new`
 The page provides both:
 
 - A list of tournaments managed by the current user.
-- A direct standalone match form.
+- The same team/player setup wizard (`MatchSetupWizard`) used for tournament-backed matches, minus the tournament attachment — real registered teams and players are used (not free-text names), so completed standalone matches still attribute performance/stats correctly.
 
-The standalone form supports:
-
-- Custom Team A name.
-- Custom Team B name.
-- Comma-separated player names for each team.
-- Overs per side.
-- Date.
-- Venue.
-- Toss winner.
-- Toss decision.
-
-Endpoint: `POST /api/matches`
+Endpoint: `POST /api/matches`. Like the tournament-backed flow, no toss is collected at creation.
 
 Standalone matches have no tournament ID and store the creating user as `ownerId`. They use the same `LiveMatch` structure and scorer as tournament-backed matches.
 
@@ -281,11 +270,13 @@ Standalone matches have no tournament ID and store the creating user as `ownerId
 |---|---|
 | `GET /api/matches/[matchId]` | Fetch match and computed live state |
 | `PATCH /api/matches/[matchId]` | Reschedule a scheduled match |
+| `POST /api/matches/[matchId]/toss` | Decide the toss (winning team + bat/bowl decision) before scoring can begin |
 | `POST /api/matches/[matchId]/events` | Add a scoring event |
 | `POST /api/matches/[matchId]/undo` | Undo the latest scoring event |
 | `POST /api/matches/[matchId]/complete` | Complete a ready match |
+| `POST /api/matches/[matchId]/scorers` | Grant/revoke the Scorer role for a match |
 
-For standalone matches, the owner or an administrator can perform scoring and match management actions. For tournament matches, the tournament organizer or an administrator can perform them.
+Match management (reschedule, delete) is restricted to the owner, the tournament organizer (for tournament matches), or an administrator. Scoring-related actions (toss, events, undo, complete) are additionally open to anyone granted the Scorer role — assigned per-match via `POST /api/matches/[matchId]/scorers`, or per-tournament (covering every match in it) via `POST /api/tournaments/[id]/scorers` — both restricted to the owner/organizer/admin to assign.
 
 ## 8. Cricket Scoring Model
 
@@ -294,6 +285,7 @@ The scoring engine uses immutable-style event replay semantics:
 - Delivery events are the source of truth.
 - Scoreboard values are computed from the event history.
 - Undo removes the latest event and recomputes the state.
+- The toss (winning team + bat/bowl decision) is optional at match creation and is instead decided once, from the scorer screen, before any delivery can be recorded — it determines which side bats first in the first innings and cannot be changed after the toss is set.
 - A match starts with the first innings.
 - Ending the first innings creates the second innings with batting and bowling sides swapped.
 - A scheduled match becomes live after the first scoring event.
@@ -435,19 +427,23 @@ Admin authorization is based on the authenticated user's `role: "admin"`.
 - `POST|DELETE /api/tournaments/[id]/participants`
 - `GET|POST /api/tournaments/[id]/teams`
 - `GET|POST /api/tournaments/[id]/matches`
+- `POST|DELETE /api/tournaments/[id]/scorers`
 - `GET|POST /api/teams`
 - `GET|PATCH|DELETE /api/teams/[teamId]`
 - `POST|DELETE /api/teams/[teamId]/players`
 - `DELETE /api/teams/[teamId]/players/[playerId]`
 - `POST /api/teams/[teamId]/logo`
+- `POST|DELETE /api/teams/[teamId]/co-owners`
 
 ### Cricket Matches
 
 - `POST /api/matches`
 - `GET|PATCH /api/matches/[matchId]`
+- `POST /api/matches/[matchId]/toss`
 - `POST /api/matches/[matchId]/events`
 - `POST /api/matches/[matchId]/undo`
 - `POST /api/matches/[matchId]/complete`
+- `POST|DELETE /api/matches/[matchId]/scorers`
 
 ### Badminton
 

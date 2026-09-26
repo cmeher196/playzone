@@ -55,6 +55,19 @@ export async function rescheduleLiveMatch(
   return match;
 }
 
+function battingOrder(
+  teamA: TeamRef,
+  teamB: TeamRef,
+  tossWinnerTeamId: string,
+  tossDecision: Decision,
+): { battingFirst: TeamRef; bowlingFirst: TeamRef } {
+  const otherId = tossWinnerTeamId === teamA.teamId ? teamB.teamId : teamA.teamId;
+  const battingFirstId = tossDecision === "bat" ? tossWinnerTeamId : otherId;
+  return battingFirstId === teamA.teamId
+    ? { battingFirst: teamA, bowlingFirst: teamB }
+    : { battingFirst: teamB, bowlingFirst: teamA };
+}
+
 export async function createLiveMatch(input: {
   tournamentId?: string;
   ownerId?: string;
@@ -63,20 +76,22 @@ export async function createLiveMatch(input: {
   overs: number;
   venue?: string;
   date: string;
-  tossWinnerTeamId: string;
-  tossDecision: Decision;
+  /** Optional — many matches are scheduled ahead of time and the toss isn't
+   * decided until the match actually starts (see `setMatchToss`). */
+  tossWinnerTeamId?: string;
+  tossDecision?: Decision;
 }): Promise<LiveMatch> {
   const items = await readAll();
-  const otherId =
-    input.tossWinnerTeamId === input.teamA.teamId
-      ? input.teamB.teamId
-      : input.teamA.teamId;
-  const battingFirstId =
-    input.tossDecision === "bat" ? input.tossWinnerTeamId : otherId;
-  const battingFirst =
-    battingFirstId === input.teamA.teamId ? input.teamA : input.teamB;
-  const bowlingFirst =
-    battingFirstId === input.teamA.teamId ? input.teamB : input.teamA;
+  const toss =
+    input.tossWinnerTeamId && input.tossDecision
+      ? { winnerTeamId: input.tossWinnerTeamId, decision: input.tossDecision }
+      : undefined;
+  // Without a toss yet, seed innings[0] with an arbitrary side batting first;
+  // it's corrected by `setMatchToss` before the match can go live, so no
+  // events depend on this placeholder in the meantime.
+  const { battingFirst, bowlingFirst } = toss
+    ? battingOrder(input.teamA, input.teamB, toss.winnerTeamId, toss.decision)
+    : { battingFirst: input.teamA, bowlingFirst: input.teamB };
 
   const match: LiveMatch = {
     id: nextMatchId(items),
@@ -87,13 +102,43 @@ export async function createLiveMatch(input: {
     overs: input.overs,
     venue: input.venue,
     date: input.date,
-    toss: { winnerTeamId: input.tossWinnerTeamId, decision: input.tossDecision },
+    toss,
     status: "scheduled",
     innings: [{ battingTeam: battingFirst, bowlingTeam: bowlingFirst, events: [] }],
     currentInnings: 0,
     createdAt: new Date().toISOString(),
   };
   items.push(match);
+  await writeAll(items);
+  return match;
+}
+
+export type SetTossResult = LiveMatch | "not-found" | "already-set" | "already-started";
+
+/** Decides the toss once the match is about to start (see canScoreLiveMatch
+ * for who may call this). Only allowed before any ball has been bowled,
+ * since it corrects which side bats/bowls first in innings[0]. */
+export async function setMatchToss(
+  id: string,
+  tossWinnerTeamId: string,
+  tossDecision: Decision,
+): Promise<SetTossResult> {
+  const items = await readAll();
+  const index = items.findIndex((m) => m.id === id);
+  if (index === -1) return "not-found";
+  const match = items[index];
+  if (match.toss) return "already-set";
+  if (match.status !== "scheduled" || match.innings[0].events.length > 0) {
+    return "already-started";
+  }
+  const { battingFirst, bowlingFirst } = battingOrder(
+    match.teamA,
+    match.teamB,
+    tossWinnerTeamId,
+    tossDecision,
+  );
+  match.toss = { winnerTeamId: tossWinnerTeamId, decision: tossDecision };
+  match.innings[0] = { battingTeam: battingFirst, bowlingTeam: bowlingFirst, events: [] };
   await writeAll(items);
   return match;
 }

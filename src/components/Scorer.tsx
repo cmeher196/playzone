@@ -36,6 +36,8 @@ export function Scorer({
   const [wType, setWType] = useState<WicketType>("bowled");
   const [wDismissed, setWDismissed] = useState("");
   const [wFielder, setWFielder] = useState("");
+  const [tossWinnerSel, setTossWinnerSel] = useState("");
+  const [tossDecisionSel, setTossDecisionSel] = useState<"bat" | "bowl">("bat");
 
   const live = data.live;
   const cur = live.innings[live.currentInnings];
@@ -94,6 +96,18 @@ export function Scorer({
 
   const inningsOver = cur.oversDone || cur.allOut;
   const isSecond = live.currentInnings === 1;
+
+  async function submitToss() {
+    if (!tossWinnerSel) {
+      setError("Select the toss winner.");
+      return;
+    }
+    await send(`/api/matches/${matchId}/toss`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tossWinnerId: tossWinnerSel, tossDecision: tossDecisionSel }),
+    });
+  }
 
   async function submitOpeners() {
     if (!strikerSel || !nonStrikerSel || strikerSel === nonStrikerSel) {
@@ -167,6 +181,35 @@ export function Scorer({
             >
               Innings over — start 2nd innings →
             </button>
+          ) : !data.match.toss ? (
+            <Setup title="Conduct the toss">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select className={selectClass} value={tossWinnerSel} onChange={(e) => setTossWinnerSel(e.target.value)}>
+                  <option value="">Toss winner…</option>
+                  <option value={data.match.teamA.teamId} className="bg-[#0a1712]">{data.match.teamA.name}</option>
+                  <option value={data.match.teamB.teamId} className="bg-[#0a1712]">{data.match.teamB.name}</option>
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["bat", "bowl"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setTossDecisionSel(d)}
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-medium capitalize transition ${
+                        tossDecisionSel === d
+                          ? "border-emerald-400 bg-emerald-400/15 text-emerald-200"
+                          : "border-white/10 bg-white/5 text-white/70"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ConfirmButton onClick={submitToss} busy={busy}>
+                Confirm toss
+              </ConfirmButton>
+            </Setup>
           ) : cur.needOpeners ? (
             <Setup title="Select opening batters">
               <div className="grid gap-2 sm:grid-cols-2">
