@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { readStoredArray, writeStoredArray } from "./mongo";
+import { listPlayers } from "./registrations";
 
 export interface ChatConversation {
   id: string;
@@ -73,12 +74,29 @@ function unreadIn(
   ).length;
 }
 
+/**
+ * Resolves the label shown to a given viewer. Group chats keep their stored
+ * name, but a direct chat is always titled after the *other* member so both
+ * participants see who they're talking to (not their own name).
+ */
+function displayNameFor(
+  conversation: ChatConversation,
+  userId: string,
+  nameOf: Map<string, string>,
+): string {
+  if (conversation.isGroup) return conversation.name;
+  const otherId = conversation.memberIds.find((memberId) => memberId !== userId);
+  return (otherId && nameOf.get(otherId)) || conversation.name;
+}
+
 export async function listChatsForUser(userId: string): Promise<ChatPreview[]> {
-  const [conversations, messages, reads] = await Promise.all([
+  const [conversations, messages, reads, players] = await Promise.all([
     readConversations(),
     readMessages(),
     readReads(),
+    listPlayers(),
   ]);
+  const nameOf = new Map(players.map((player) => [player.id, player.name]));
   const lastReadOf = new Map(
     reads.filter((read) => read.userId === userId).map((read) => [read.conversationId, read.lastReadAt]),
   );
@@ -86,6 +104,7 @@ export async function listChatsForUser(userId: string): Promise<ChatPreview[]> {
     .filter((conversation) => conversation.memberIds.includes(userId))
     .map((conversation) => ({
       ...conversation,
+      name: displayNameFor(conversation, userId, nameOf),
       lastMessage: messages
         .filter((message) => message.conversationId === conversation.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0],
