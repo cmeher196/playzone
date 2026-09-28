@@ -87,10 +87,22 @@ export function Scorer({
     else if (pendingExtra === "no-ball")
       ev = { t: "ball", extraType: "no-ball", runs: n };
     else ev = { t: "ball", runs: 0, extraType: pendingExtra, extraRuns: n };
+    const extra = pendingExtra;
     const ok = await postEvent(ev);
     if (ok) {
       setPendingExtra(null);
-      if (n === 4) celebrate("four", "FOUR!");
+      if (extra === "wide") {
+        const total = 1 + n;
+        celebrate("wide", total > 1 ? `${total} Wides` : "Wide");
+      } else if (extra === "no-ball") {
+        if (n === 4) celebrate("four", "FOUR!");
+        else if (n === 6) celebrate("six", "SIX!");
+        else celebrate("no-ball", "No Ball!");
+      } else if (extra === "bye") {
+        celebrate("bye", n > 1 ? `Bye +${n}` : "Bye");
+      } else if (extra === "leg-bye") {
+        celebrate("leg-bye", n > 1 ? `Leg Bye +${n}` : "Leg Bye");
+      } else if (n === 4) celebrate("four", "FOUR!");
       else if (n === 6) celebrate("six", "SIX!");
       else celebrate("run", n === 0 ? "Dot ball" : `+${n} Run${n > 1 ? "s" : ""}`);
     }

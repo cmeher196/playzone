@@ -269,3 +269,60 @@ input[type="number"] {
     animation-duration: 1.5s;
   }
 }
+
+/* FOUR / SIX boundary burst: a glow + expanding ring + radiating particles
+ * behind a punchy scale-in label, all nested inside `.score-celebration`
+ * for the overall entrance/exit envelope. */
+.boundary-glow {
+  animation: boundary-glow-pulse 1.3s ease-out forwards;
+}
+
+.boundary-ring {
+  animation: boundary-ring-pulse 1.1s ease-out forwards;
+}
+
+.boundary-particle {
+  animation: boundary-particle-fly 1.2s ease-out forwards;
+}
+
+.boundary-text {
+  animation: boundary-text-punch 650ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes boundary-glow-pulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+@keyframes boundary-ring-pulse {
+  0% { transform: scale(0.3); opacity: 0.9; }
+  70% { opacity: 0.35; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+@keyframes boundary-particle-fly {
+  0% { transform: translate(0, 0) scale(0.4) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% {
+    transform: translate(var(--particle-dx), var(--particle-dy)) scale(0.4) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+@keyframes boundary-text-punch {
+  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  45% { transform: scale(1.25) rotate(4deg); opacity: 1; }
+  65% { transform: scale(0.95) rotate(-2deg); }
+  80% { transform: scale(1.05) rotate(1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boundary-glow,
+  .boundary-ring,
+  .boundary-particle,
+  .boundary-text {
+    animation-duration: 1.5s;
+  }
+}
