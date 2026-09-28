@@ -397,7 +397,12 @@ export function reduceInnings(
       let outcome: string;
       if (dismissed) {
         label = "W";
-        outcome = `OUT! ${ev.wicket ? dismissalText(ev.wicket, nameOf, bowlerName) : ""}`.trim();
+        // Name the batter who's actually out — for a run-out it may be the
+        // non-striker, not the one facing this delivery, and the "bowler to
+        // striker" framing below would otherwise read as if the striker
+        // were dismissed.
+        const dismissedName = ev.wicket ? nameOf(ev.wicket.dismissedId) : strikerName;
+        outcome = `OUT! ${dismissedName} ${ev.wicket ? dismissalText(ev.wicket, nameOf, bowlerName) : ""}`.trim();
       } else if (et === "wide") {
         const total = 1 + extraRan;
         label = total > 1 ? `${total}wd` : "wd";
