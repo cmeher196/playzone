@@ -38,6 +38,7 @@ export function Scorer({
   const [wType, setWType] = useState<WicketType>("bowled");
   const [wDismissed, setWDismissed] = useState("");
   const [wFielder, setWFielder] = useState("");
+  const [wRuns, setWRuns] = useState(0);
   const [tossWinnerSel, setTossWinnerSel] = useState("");
   const [tossDecisionSel, setTossDecisionSel] = useState<"bat" | "bowl">("bat");
   const [celebration, setCelebration] = useState<Celebration | null>(null);
@@ -175,9 +176,14 @@ export function Scorer({
   async function submitWicket() {
     const dismissed = wDismissed || cur!.strikerId;
     if (!dismissed) return;
+    // Only a run-out can happen mid-run — the batters may have already
+    // completed a single/double/triple before being caught short of the
+    // crease on a further run. Every other dismissal ends the ball dead,
+    // so no runs are possible.
+    const runsCompleted = wType === "run-out" ? wRuns : 0;
     const ok = await postEvent({
       t: "ball",
-      runs: 0,
+      runs: runsCompleted,
       wicket: {
         type: wType,
         dismissedId: dismissed,
@@ -189,6 +195,7 @@ export function Scorer({
       setWFielder("");
       setWDismissed("");
       setWType("bowled");
+      setWRuns(0);
       const batter = ok.live.innings[ok.live.currentInnings]?.batters.find(
         (b) => b.playerId === dismissed,
       );
@@ -356,7 +363,15 @@ export function Scorer({
           ) : showWicket ? (
             <Setup title="How was the batter out?">
               <div className="grid gap-2 sm:grid-cols-3">
-                <select className={selectClass} value={wType} onChange={(e) => setWType(e.target.value as WicketType)}>
+                <select
+                  className={selectClass}
+                  value={wType}
+                  onChange={(e) => {
+                    const next = e.target.value as WicketType;
+                    setWType(next);
+                    if (next !== "run-out") setWRuns(0);
+                  }}
+                >
                   {WICKET_TYPES.map((w) => (
                     <option key={w} value={w} className="bg-[#0a1712]">
                       {w}
@@ -383,6 +398,29 @@ export function Scorer({
                   ))}
                 </select>
               </div>
+              {wType === "run-out" && (
+                <div>
+                  <p className="mb-1.5 text-xs text-white/50">
+                    Runs completed before the run-out (they may have run a single/double/triple first)
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[0, 1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setWRuns(n)}
+                        className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                          wRuns === n
+                            ? "border-emerald-400 bg-emerald-400/15 text-emerald-200"
+                            : "border-white/10 bg-white/5 text-white/70"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <ConfirmButton onClick={submitWicket} busy={busy}>
                   Confirm wicket
