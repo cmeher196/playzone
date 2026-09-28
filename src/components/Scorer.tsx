@@ -34,6 +34,7 @@ export function Scorer({
   const [nonStrikerSel, setNonStrikerSel] = useState("");
   const [bowlerSel, setBowlerSel] = useState("");
   const [batterSel, setBatterSel] = useState("");
+  const [newBatterTakesStrike, setNewBatterTakesStrike] = useState(true);
   const [wType, setWType] = useState<WicketType>("bowled");
   const [wDismissed, setWDismissed] = useState("");
   const [wFielder, setWFielder] = useState("");
@@ -133,6 +134,26 @@ export function Scorer({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tossWinnerId: tossWinnerSel, tossDecision: tossDecisionSel }),
     });
+  }
+
+  async function swapStrike() {
+    await postEvent({ t: "swapStrike" });
+  }
+
+  async function confirmNewBatter() {
+    if (!batterSel) return;
+    // The newBatter event fills whichever end the dismissed batter vacated.
+    // If the scorer says the new batter should be at the *other* end
+    // instead (e.g. a run-out where the batters had crossed), correct it
+    // with a follow-up strike swap.
+    const vacatedEnd: "striker" | "non-striker" = cur!.strikerId ? "non-striker" : "striker";
+    const wantsOtherEnd = (newBatterTakesStrike ? "striker" : "non-striker") !== vacatedEnd;
+    const ok = await postEvent({ t: "newBatter", batterId: batterSel });
+    if (ok) {
+      if (wantsOtherEnd) await swapStrike();
+      setBatterSel("");
+      setNewBatterTakesStrike(true);
+    }
   }
 
   async function submitOpeners() {
@@ -303,14 +324,32 @@ export function Scorer({
                   </option>
                 ))}
               </select>
-              <ConfirmButton
-                busy={busy}
-                onClick={async () => {
-                  if (!batterSel) return;
-                  const ok = await postEvent({ t: "newBatter", batterId: batterSel });
-                  if (ok) setBatterSel("");
-                }}
-              >
+              <div>
+                <p className="mb-1.5 text-xs text-white/50">Will the new batter take strike?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: true, label: "Strike (facing next ball)" },
+                    { value: false, label: "Non-striker" },
+                  ].map((option) => (
+                    <button
+                      key={String(option.value)}
+                      type="button"
+                      onClick={() => setNewBatterTakesStrike(option.value)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                        newBatterTakesStrike === option.value
+                          ? "border-emerald-400 bg-emerald-400/15 text-emerald-200"
+                          : "border-white/10 bg-white/5 text-white/70"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-white/40">
+                  If they crossed during a run-out, pick the end they actually ended up at.
+                </p>
+              </div>
+              <ConfirmButton busy={busy} onClick={confirmNewBatter}>
                 Send batter in
               </ConfirmButton>
             </Setup>
@@ -359,6 +398,21 @@ export function Scorer({
             </Setup>
           ) : (
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                <span className="text-white/70">
+                  🏏 <span className="font-medium text-white">{cur.batters.find((b) => b.playerId === cur.strikerId)?.name ?? "Striker"}</span> on strike
+                  <span className="text-white/40"> · {cur.batters.find((b) => b.playerId === cur.nonStrikerId)?.name ?? "Non-striker"} at other end</span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={swapStrike}
+                  title="Use after a run-out where the batters had crossed, or to correct who's facing"
+                  className="shrink-0 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  🔁 Change strike
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {(["wide", "no-ball", "bye", "leg-bye"] as ExtraType[]).map((ex) => (
                   <button

@@ -293,6 +293,7 @@ export const scoreEventSchema = z.discriminatedUnion("t", [
   z.object({ t: z.literal("bowler"), bowlerId: z.string().min(1) }),
   z.object({ t: z.literal("newBatter"), batterId: z.string().min(1) }),
   z.object({ t: z.literal("endInnings") }),
+  z.object({ t: z.literal("swapStrike") }),
   z.object({
     t: z.literal("ball"),
     runs: z.number().int().min(0).max(7),

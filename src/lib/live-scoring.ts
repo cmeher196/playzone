@@ -56,12 +56,19 @@ export interface NewBatterEvent {
 export interface EndInningsEvent {
   t: "endInnings";
 }
+/** Manually swaps who's on strike without recording a delivery — needed
+ * when a run-out (or other mid-run event) leaves the batters at ends the
+ * automatic odd-runs swap can't infer, e.g. because they'd already crossed. */
+export interface SwapStrikeEvent {
+  t: "swapStrike";
+}
 export type ScoreEvent =
   | BallEvent
   | OpenersEvent
   | BowlerEvent
   | NewBatterEvent
-  | EndInningsEvent;
+  | EndInningsEvent
+  | SwapStrikeEvent;
 
 export interface StoredInnings {
   battingTeam: TeamRef;
@@ -286,6 +293,8 @@ export function reduceInnings(
       if (!strikerId) strikerId = ev.batterId;
       else if (!nonStrikerId) nonStrikerId = ev.batterId;
       needBatter = false;
+    } else if (ev.t === "swapStrike") {
+      if (!closed && !needBatter && !needBowler) swap();
     } else if (ev.t === "endInnings") {
       closed = true;
     } else if (ev.t === "ball") {
