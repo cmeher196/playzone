@@ -27,7 +27,9 @@ function ov(balls: number): string {
 function chipClass(label: string): string {
   const base =
     "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-xs font-semibold ";
-  if (label === "W") return base + "bg-rose-500/20 text-rose-300";
+  // Wicket labels are "W" or, when runs were completed before a run-out,
+  // "1+W" / "2+W" / "3+W" — always ends with the uppercase "W".
+  if (label.endsWith("W")) return base + "bg-rose-500/20 text-rose-300";
   if (label === "6") return base + "bg-amber-400/20 text-amber-300";
   if (label === "4") return base + "bg-sky-400/20 text-sky-300";
   if (label.includes("wd") || label.includes("nb"))

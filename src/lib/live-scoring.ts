@@ -397,7 +397,9 @@ export function reduceInnings(
       let label: string;
       let outcome: string;
       if (dismissed) {
-        label = "W";
+        // A run-out can happen after runs are already completed off this
+        // ball — show both, e.g. "1+W" or "2+W", instead of just "W".
+        label = teamAdd > 0 ? `${teamAdd}+W` : "W";
         const dismissedName = ev.wicket ? nameOf(ev.wicket.dismissedId) : strikerName;
         if (ev.wicket && ev.wicket.dismissedId !== strikerIdAtDelivery) {
           // The non-striker was run out, not the one facing this delivery.
