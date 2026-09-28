@@ -41,6 +41,11 @@ export function Scorer({
   const [wRuns, setWRuns] = useState(0);
   const [tossWinnerSel, setTossWinnerSel] = useState("");
   const [tossDecisionSel, setTossDecisionSel] = useState<"bat" | "bowl">("bat");
+  const [lineupXI, setLineupXI] = useState<string[]>([]);
+  const [twelfthManSel, setTwelfthManSel] = useState("");
+  const [captainSel, setCaptainSel] = useState("");
+  const [viceCaptainSel, setViceCaptainSel] = useState("");
+  const [wicketkeeperSel, setWicketkeeperSel] = useState("");
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const celebrationCounter = useRef(0);
 
@@ -124,6 +129,47 @@ export function Scorer({
 
   const inningsOver = cur.oversDone || cur.allOut;
   const isSecond = live.currentInnings === 1;
+
+  // Playing XI / 12th man / roles are confirmed per team right before the
+  // match starts (once for each team), narrowing that team's full roster
+  // down to just the XI for the rest of the match.
+  const lineupTeamKey: "teamA" | "teamB" | null = !data.match.lineups?.teamA
+    ? "teamA"
+    : !data.match.lineups?.teamB
+      ? "teamB"
+      : null;
+  const lineupTeam = lineupTeamKey ? data.match[lineupTeamKey] : null;
+
+  async function confirmLineup() {
+    if (!lineupTeam) return;
+    if (lineupXI.length !== 11) {
+      setError("Select exactly 11 players for the playing XI.");
+      return;
+    }
+    if (!captainSel || !viceCaptainSel || !wicketkeeperSel) {
+      setError("Choose captain, vice-captain, and wicketkeeper.");
+      return;
+    }
+    const ok = await send(`/api/matches/${matchId}/lineup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamId: lineupTeam.teamId,
+        playingXI: lineupXI,
+        twelfthManId: twelfthManSel || undefined,
+        captainId: captainSel,
+        viceCaptainId: viceCaptainSel,
+        wicketkeeperId: wicketkeeperSel,
+      }),
+    });
+    if (ok) {
+      setLineupXI([]);
+      setTwelfthManSel("");
+      setCaptainSel("");
+      setViceCaptainSel("");
+      setWicketkeeperSel("");
+    }
+  }
 
   async function submitToss() {
     if (!tossWinnerSel) {
@@ -272,6 +318,89 @@ export function Scorer({
               </div>
               <ConfirmButton onClick={submitToss} busy={busy}>
                 Confirm toss
+              </ConfirmButton>
+            </Setup>
+          ) : lineupTeamKey && lineupTeam ? (
+            <Setup title={`Confirm ${lineupTeam.name}'s playing XI`}>
+              <p className="text-xs text-white/50">
+                Select exactly 11 players from the full squad ({lineupXI.length}/11 selected).
+              </p>
+              <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
+                {lineupTeam.players.map((p) => {
+                  const checked = lineupXI.includes(p.playerId);
+                  const disabled = !checked && lineupXI.length >= 11;
+                  return (
+                    <label
+                      key={p.playerId}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                        checked
+                          ? "border-emerald-400 bg-emerald-400/10 text-emerald-100"
+                          : "border-white/10 bg-white/5 text-white/70"
+                      } ${disabled ? "opacity-40" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() =>
+                          setLineupXI((value) =>
+                            checked ? value.filter((id) => id !== p.playerId) : [...value, p.playerId],
+                          )
+                        }
+                        className="h-4 w-4 accent-emerald-400"
+                      />
+                      {p.name}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {lineupXI.length === 11 && (
+                <div>
+                  <p className="mb-1.5 text-xs text-white/50">12th man (optional)</p>
+                  <select className={selectClass} value={twelfthManSel} onChange={(e) => setTwelfthManSel(e.target.value)}>
+                    <option value="">None</option>
+                    {lineupTeam.players
+                      .filter((p) => !lineupXI.includes(p.playerId))
+                      .map((p) => (
+                        <option key={p.playerId} value={p.playerId} className="bg-[#0a1712]">
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {lineupXI.length === 11 && (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {[
+                    { label: "Captain", value: captainSel, setValue: setCaptainSel },
+                    { label: "Vice-captain", value: viceCaptainSel, setValue: setViceCaptainSel },
+                    { label: "Wicketkeeper", value: wicketkeeperSel, setValue: setWicketkeeperSel },
+                  ].map((role) => (
+                    <label key={role.label} className="text-xs text-white/50">
+                      {role.label}
+                      <select
+                        className={`${selectClass} mt-1`}
+                        value={role.value}
+                        onChange={(e) => role.setValue(e.target.value)}
+                      >
+                        <option value="">Select…</option>
+                        {lineupTeam.players
+                          .filter((p) => lineupXI.includes(p.playerId))
+                          .map((p) => (
+                            <option key={p.playerId} value={p.playerId} className="bg-[#0a1712]">
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <ConfirmButton busy={busy} onClick={confirmLineup}>
+                Confirm {lineupTeam.name}&apos;s lineup
               </ConfirmButton>
             </Setup>
           ) : cur.needOpeners ? (

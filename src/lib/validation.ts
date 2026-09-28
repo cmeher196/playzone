@@ -284,6 +284,37 @@ export const matchTossSchema = z.object({
 });
 export type MatchTossInput = z.infer<typeof matchTossSchema>;
 
+export const matchLineupSchema = z
+  .object({
+    teamId: z.string().min(1, "Team is required"),
+    playingXI: z.array(z.string().min(1)).length(11, "Select exactly 11 players"),
+    twelfthManId: z.string().min(1).optional(),
+    captainId: z.string().min(1, "Select a captain"),
+    viceCaptainId: z.string().min(1, "Select a vice-captain"),
+    wicketkeeperId: z.string().min(1, "Select a wicketkeeper"),
+  })
+  .refine((d) => d.captainId !== d.viceCaptainId, {
+    error: "Captain and vice-captain must be different players",
+    path: ["viceCaptainId"],
+  })
+  .refine((d) => d.playingXI.includes(d.captainId), {
+    error: "Captain must be in the playing XI",
+    path: ["captainId"],
+  })
+  .refine((d) => d.playingXI.includes(d.viceCaptainId), {
+    error: "Vice-captain must be in the playing XI",
+    path: ["viceCaptainId"],
+  })
+  .refine((d) => d.playingXI.includes(d.wicketkeeperId), {
+    error: "Wicketkeeper must be in the playing XI",
+    path: ["wicketkeeperId"],
+  })
+  .refine((d) => !d.twelfthManId || !d.playingXI.includes(d.twelfthManId), {
+    error: "12th man must not be one of the playing XI",
+    path: ["twelfthManId"],
+  });
+export type MatchLineupInput = z.infer<typeof matchLineupSchema>;
+
 export const scoreEventSchema = z.discriminatedUnion("t", [
   z.object({
     t: z.literal("openers"),

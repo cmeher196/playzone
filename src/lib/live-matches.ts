@@ -7,6 +7,7 @@ import {
   type Decision,
   type InningsState,
   type ComputedMatch,
+  type TeamLineup,
 } from "./live-scoring";
 import { addMatchToTournament, type Match } from "./tournaments";
 import { readStoredArray, writeStoredArray } from "./mongo";
@@ -139,6 +140,52 @@ export async function setMatchToss(
   );
   match.toss = { winnerTeamId: tossWinnerTeamId, decision: tossDecision };
   match.innings[0] = { battingTeam: battingFirst, bowlingTeam: bowlingFirst, events: [] };
+  await writeAll(items);
+  return match;
+}
+
+export type SetLineupResult =
+  | LiveMatch
+  | "not-found"
+  | "already-set"
+  | "already-started"
+  | "invalid-team";
+
+/**
+ * Confirms a team's playing XI (+ 12th man, captain, vice-captain,
+ * wicketkeeper) for this match once it's about to start. `team.players`
+ * (full roster until now) is narrowed down to just the playing XI —
+ * mirroring `setMatchToss`, only allowed before any ball has been bowled.
+ */
+export async function setMatchLineup(
+  id: string,
+  teamId: string,
+  lineup: TeamLineup,
+): Promise<SetLineupResult> {
+  const items = await readAll();
+  const index = items.findIndex((m) => m.id === id);
+  if (index === -1) return "not-found";
+  const match = items[index];
+  if (match.status !== "scheduled" || match.innings[0].events.length > 0) {
+    return "already-started";
+  }
+  const teamKey: "teamA" | "teamB" | null =
+    match.teamA.teamId === teamId ? "teamA" : match.teamB.teamId === teamId ? "teamB" : null;
+  if (!teamKey) return "invalid-team";
+  if (match.lineups?.[teamKey]) return "already-set";
+
+  const xiSet = new Set(lineup.playingXI);
+  const team = match[teamKey];
+  team.players = team.players.filter((player) => xiSet.has(player.playerId));
+
+  // Innings team refs are separate copies once persisted (not the same
+  // object as match.teamA/teamB), so re-point them at the narrowed roster.
+  for (const inn of match.innings) {
+    if (inn.battingTeam.teamId === teamId) inn.battingTeam = team;
+    if (inn.bowlingTeam.teamId === teamId) inn.bowlingTeam = team;
+  }
+
+  match.lineups = { ...match.lineups, [teamKey]: lineup };
   await writeAll(items);
   return match;
 }

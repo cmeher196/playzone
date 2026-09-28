@@ -207,9 +207,9 @@ Most authenticated pages use `DashboardShell`, which provides:
 5. If an entry fee applies, the player uses the configured UPI details and submits a UTR/reference value.
 6. The organizer creates teams and adds players.
 7. The organizer creates tournament-backed matches.
-8. The organizer selects two teams, overs, date, and venue. The toss is **not** decided at this point — many matches are scheduled ahead of when they'll actually start.
+8. The organizer selects two teams, overs, date, and venue. Neither the toss nor the playing XI/roles are decided at this point — both teams' full current rosters are attached to the match as-is, and many matches are scheduled ahead of when they'll actually start.
 9. The match opens in scorer mode.
-10. Before any ball-by-ball events can be recorded, the scorer conducts the toss (toss-winning team and bat/bowl decision) via `POST /api/matches/[matchId]/toss`; this determines which side bats first in the first innings.
+10. Before any ball-by-ball events can be recorded: the scorer confirms each team's playing XI (exactly 11 of that team's full roster), optionally a 12th man, and that team's captain/vice-captain/wicketkeeper for this match, via `POST /api/matches/[matchId]/lineup` (once per team) — this narrows the team's roster on the match down to just the XI. The scorer also conducts the toss (toss-winning team and bat/bowl decision) via `POST /api/matches/[matchId]/toss`; this determines which side bats first in the first innings.
 11. The scorer records ball-by-ball events.
 12. The system derives scores, wickets, overs, batsman cards, bowler cards, extras, commentary, and result data from the event log.
 13. The scorer completes the match.
@@ -238,16 +238,11 @@ The existing form supports:
 - Two team slots: Team A and Team B.
 - Search and select existing tournament teams.
 - Add a new team from the team picker.
-- Search and select players from the selected team's squad.
-- Add a registered player to the selected team.
-- Add an unregistered player inline with their name and mobile number; the player is created as a passwordless account and added to the squad without replacing the current session.
-- Choose captain, vice-captain, and wicketkeeper for each selected squad.
-- Return to the team selection screen to choose Team B after completing Team A.
 - Overs per side.
 - Match date.
 - Venue.
 
-The toss is intentionally **not** collected here — see §8 below. This lets an organizer schedule a match without needing to know who'll actually be present to call the toss when it starts.
+Each selected team's **entire current roster** is attached to the match automatically — the form does not ask which players are playing, nor for captain/vice-captain/wicketkeeper/12th man. Managing who's actually on a team (adding players, including unregistered players by name + mobile) is done from that team's own page (`/teams/[teamId]`), not from match creation. The toss is also intentionally **not** collected here — see §8 below. Together this lets an organizer schedule a match without needing to know the final XI, roles, or who'll call the toss until it actually starts.
 
 The form posts to `POST /api/tournaments/[id]/matches` and redirects to `/matches/[matchId]`.
 
@@ -258,9 +253,9 @@ Route: `/matches/new`
 The page provides both:
 
 - A list of tournaments managed by the current user.
-- The same team/player setup wizard (`MatchSetupWizard`) used for tournament-backed matches, minus the tournament attachment — real registered teams and players are used (not free-text names), so completed standalone matches still attribute performance/stats correctly.
+- The same team setup wizard (`MatchSetupWizard`) used for tournament-backed matches, minus the tournament attachment — real registered teams are used (not free-text names), so completed standalone matches still attribute performance/stats correctly.
 
-Endpoint: `POST /api/matches`. Like the tournament-backed flow, no toss is collected at creation.
+Endpoint: `POST /api/matches`. Like the tournament-backed flow, only the two teams (full roster) and match logistics are collected — no toss, playing XI, or roles.
 
 Standalone matches have no tournament ID and store the creating user as `ownerId`. They use the same `LiveMatch` structure and scorer as tournament-backed matches.
 
@@ -270,6 +265,7 @@ Standalone matches have no tournament ID and store the creating user as `ownerId
 |---|---|
 | `GET /api/matches/[matchId]` | Fetch match and computed live state |
 | `PATCH /api/matches/[matchId]` | Reschedule a scheduled match |
+| `POST /api/matches/[matchId]/lineup` | Confirm one team's playing XI, 12th man, captain, vice-captain, and wicketkeeper for this match before scoring can begin |
 | `POST /api/matches/[matchId]/toss` | Decide the toss (winning team + bat/bowl decision) before scoring can begin |
 | `POST /api/matches/[matchId]/events` | Add a scoring event |
 | `POST /api/matches/[matchId]/undo` | Undo the latest scoring event |
@@ -285,6 +281,7 @@ The scoring engine uses immutable-style event replay semantics:
 - Delivery events are the source of truth.
 - Scoreboard values are computed from the event history.
 - Undo removes the latest event and recomputes the state.
+- Both teams' full rosters are attached at match creation; each team's playing XI (exactly 11), optional 12th man, captain, vice-captain, and wicketkeeper are confirmed once per team from the scorer screen before any delivery can be recorded (`POST /api/matches/[matchId]/lineup`) — this narrows that team's roster on the match down to just the XI, so only XI members are selectable as openers/bowlers/new batters for the rest of the match. Cannot be changed once confirmed.
 - The toss (winning team + bat/bowl decision) is optional at match creation and is instead decided once, from the scorer screen, before any delivery can be recorded — it determines which side bats first in the first innings and cannot be changed after the toss is set.
 - A match starts with the first innings.
 - Ending the first innings creates the second innings with batting and bowling sides swapped.
@@ -439,6 +436,7 @@ Admin authorization is based on the authenticated user's `role: "admin"`.
 
 - `POST /api/matches`
 - `GET|PATCH /api/matches/[matchId]`
+- `POST /api/matches/[matchId]/lineup`
 - `POST /api/matches/[matchId]/toss`
 - `POST /api/matches/[matchId]/events`
 - `POST /api/matches/[matchId]/undo`

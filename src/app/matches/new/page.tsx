@@ -4,7 +4,6 @@ import { getSessionUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { listTournaments } from "@/lib/tournaments";
 import { listTeamsForTournament, listTeams } from "@/lib/teams";
-import { listPlayers } from "@/lib/registrations";
 import { DashboardShell } from "@/components/DashboardShell";
 import { MatchSetupWizard } from "@/components/MatchSetupWizard";
 
@@ -22,7 +21,6 @@ export default async function NewMatchPage() {
     })),
   );
   const teams = await listTeams();
-  const players = (await listPlayers()).map((player) => ({ id: player.id, name: player.name, mobile: player.mobile }));
 
   return (
     <DashboardShell userName={user.name} isAdmin={admin}>
@@ -76,7 +74,7 @@ export default async function NewMatchPage() {
         <p className="mt-1 mb-4 text-sm text-white/50">
           Set up a one-off match with your own teams and players.
         </p>
-        <MatchSetupWizard initialTeams={teams} availablePlayers={players} />
+        <MatchSetupWizard initialTeams={teams} />
       </div>
     </DashboardShell>
   );

@@ -76,6 +76,17 @@ export interface StoredInnings {
   events: ScoreEvent[];
 }
 
+/** A team's confirmed playing XI and roles for one specific match — decided
+ * at match start, not creation, since it can differ match to match even for
+ * the same team. */
+export interface TeamLineup {
+  playingXI: string[];
+  twelfthManId?: string;
+  captainId: string;
+  viceCaptainId: string;
+  wicketkeeperId: string;
+}
+
 export interface LiveMatch {
   id: string;
   tournamentId?: string;
@@ -90,6 +101,11 @@ export interface LiveMatch {
   /** Undecided until the match actually starts — not required at creation
    * time since a scheduled match may not begin play right away. */
   toss?: { winnerTeamId: string; decision: Decision };
+  /** Playing XI/12th man/captain/vice-captain/wicketkeeper per team — like
+   * the toss, decided at match start rather than creation. `teamA.players`
+   * / `teamB.players` hold the full roster until this is confirmed, at
+   * which point they're narrowed down to just the playing XI. */
+  lineups?: { teamA?: TeamLineup; teamB?: TeamLineup };
   status: "scheduled" | "live" | "completed";
   innings: StoredInnings[];
   currentInnings: number;
