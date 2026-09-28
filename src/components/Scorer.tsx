@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ScoreboardView, type ScoreboardData } from "./ScoreboardView";
+import { ScoreCelebration, type Celebration } from "./ScoreCelebration";
 import type { ExtraType, WicketType } from "@/lib/live-scoring";
 
 const WICKET_TYPES: WicketType[] = [
@@ -38,12 +39,19 @@ export function Scorer({
   const [wFielder, setWFielder] = useState("");
   const [tossWinnerSel, setTossWinnerSel] = useState("");
   const [tossDecisionSel, setTossDecisionSel] = useState<"bat" | "bowl">("bat");
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const celebrationCounter = useRef(0);
+
+  function celebrate(kind: Celebration["kind"], label: string) {
+    celebrationCounter.current += 1;
+    setCelebration({ id: celebrationCounter.current, kind, label });
+  }
 
   const live = data.live;
   const cur = live.innings[live.currentInnings];
   const completed = data.match.status === "completed";
 
-  async function send(url: string, init: RequestInit): Promise<boolean> {
+  async function send(url: string, init: RequestInit): Promise<ScoreboardData | null> {
     setBusy(true);
     setError(null);
     try {
@@ -53,13 +61,14 @@ export function Scorer({
       };
       if (!res.ok) {
         setError(d.error ?? "Action failed. Please try again.");
-        return false;
+        return null;
       }
-      setData({ match: d.match, live: d.live });
-      return true;
+      const next = { match: d.match, live: d.live };
+      setData(next);
+      return next;
     } catch {
       setError("Network error. Please try again.");
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -79,7 +88,12 @@ export function Scorer({
       ev = { t: "ball", extraType: "no-ball", runs: n };
     else ev = { t: "ball", runs: 0, extraType: pendingExtra, extraRuns: n };
     const ok = await postEvent(ev);
-    if (ok) setPendingExtra(null);
+    if (ok) {
+      setPendingExtra(null);
+      if (n === 4) celebrate("four", "FOUR!");
+      else if (n === 6) celebrate("six", "SIX!");
+      else celebrate("run", n === 0 ? "Dot ball" : `+${n} Run${n > 1 ? "s" : ""}`);
+    }
   }
 
   if (!cur) {
@@ -142,11 +156,21 @@ export function Scorer({
       setWFielder("");
       setWDismissed("");
       setWType("bowled");
+      const batter = ok.live.innings[ok.live.currentInnings]?.batters.find(
+        (b) => b.playerId === dismissed,
+      );
+      if (batter && batter.runs === 0) {
+        if (batter.balls <= 1) celebrate("golden-duck", "GOLDEN DUCK!");
+        else celebrate("duck", "DUCK!");
+      } else {
+        celebrate("wicket", "WICKET!");
+      }
     }
   }
 
   return (
     <div className="space-y-5">
+      <ScoreCelebration celebration={celebration} onDone={() => setCelebration(null)} />
       <ScoreboardView data={data} />
 
       {error && (

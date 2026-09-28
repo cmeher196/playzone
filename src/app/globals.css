@@ -236,3 +236,36 @@ input[type="number"] {
     animation-duration: 2.5s;
   }
 }
+
+/* Scorer feedback: brief, non-blocking pop/fade animations for runs,
+ * boundaries, wickets, and ducks. */
+.score-toast {
+  animation: score-toast-pop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.score-celebration {
+  animation: score-celebration-pop 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes score-toast-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+  20% { opacity: 1; transform: translateY(0) scale(1.05); }
+  35% { transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.95); }
+}
+
+@keyframes score-celebration-pop {
+  0% { opacity: 0; transform: scale(0.6) rotate(-4deg); }
+  15% { opacity: 1; transform: scale(1.15) rotate(2deg); }
+  30% { transform: scale(1) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-toast,
+  .score-celebration {
+    animation-duration: 1.5s;
+  }
+}
