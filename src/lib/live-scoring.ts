@@ -301,6 +301,7 @@ export function reduceInnings(
       if (closed || needBatter || needBowler || !strikerId || !nonStrikerId || !bowlerId) {
         continue;
       }
+      const strikerIdAtDelivery = strikerId; // captured before a wicket can clear it below
       const striker = ensureBat(strikerId);
       const bowler = ensureBowl(bowlerId);
       const isFreeHit = freeHitActive;
@@ -397,12 +398,18 @@ export function reduceInnings(
       let outcome: string;
       if (dismissed) {
         label = "W";
-        // Name the batter who's actually out — for a run-out it may be the
-        // non-striker, not the one facing this delivery, and the "bowler to
-        // striker" framing below would otherwise read as if the striker
-        // were dismissed.
         const dismissedName = ev.wicket ? nameOf(ev.wicket.dismissedId) : strikerName;
-        outcome = `OUT! ${dismissedName} ${ev.wicket ? dismissalText(ev.wicket, nameOf, bowlerName) : ""}`.trim();
+        if (ev.wicket && ev.wicket.dismissedId !== strikerIdAtDelivery) {
+          // The non-striker was run out, not the one facing this delivery.
+          // Putting "OUT!" right after the striker's name (as below) would
+          // read as if the striker were dismissed, so state the runs
+          // completed and the actual wicket as clearly separate clauses.
+          const runsPhrase = teamAdd > 0 ? `${teamAdd} run${teamAdd > 1 ? "s" : ""}` : "no run";
+          const fielderName = ev.wicket.fielderId ? nameOf(ev.wicket.fielderId) : undefined;
+          outcome = `${runsPhrase} — ${dismissedName} is run out${fielderName ? ` (${fielderName})` : ""}!`;
+        } else {
+          outcome = `OUT! ${dismissedName} ${ev.wicket ? dismissalText(ev.wicket, nameOf, bowlerName) : ""}`.trim();
+        }
       } else if (et === "wide") {
         const total = 1 + extraRan;
         label = total > 1 ? `${total}wd` : "wd";
