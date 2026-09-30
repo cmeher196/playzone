@@ -1,6 +1,4 @@
 import { readStoredArray, writeStoredArray } from "./mongo";
-import { listPlayers } from "./registrations";
-import { listTeams } from "./teams";
 
 export type AuctionStatus = "setup" | "live" | "completed";
 export type AuctionPlayerStatus = "pending" | "current" | "sold" | "unsold";
@@ -47,6 +45,18 @@ export interface Auction {
   status: AuctionStatus;
   round: number;
   initialPurse: number;
+  /** Base price given to every player who self-registers. */
+  defaultBasePrice: number;
+  /** Optional — the auction date/time, and the single tournament it's
+   * dedicated to, if any. Purely informational; registration eligibility
+   * isn't restricted by this link. */
+  date?: string;
+  time?: string;
+  tournamentId?: string;
+  /** Optional venue (or "Online") and a short description, shown on the
+   * auction's card/page. Purely informational. */
+  venue?: string;
+  description?: string;
   teams: AuctionTeam[];
   players: AuctionPlayer[];
   currentPlayerId?: string;
@@ -86,38 +96,122 @@ export async function createAuction(input: {
   ownerId: string;
   ownerName: string;
   purse: number;
-  teamIds: string[];
-  playerIds: string[];
+  defaultBasePrice: number;
+  date?: string;
+  time?: string;
+  tournamentId?: string;
+  venue?: string;
+  description?: string;
 }): Promise<Auction> {
-  const [auctions, registeredPlayers, registeredTeams] = await Promise.all([
-    readAll(),
-    listPlayers(),
-    listTeams(),
-  ]);
-  const teamSet = new Set(input.teamIds);
-  const playerSet = new Set(input.playerIds);
-  const teams: AuctionTeam[] = registeredTeams
-    .filter((team) => teamSet.has(team.id))
-    .map((team) => ({ id: team.id, name: team.name, initialPurse: input.purse, purse: input.purse, players: [] }));
-  const players: AuctionPlayer[] = registeredPlayers
-    .filter((player) => playerSet.has(player.id))
-    .map((player, index) => ({
-      id: `AP-${String(index + 1).padStart(4, "0")}`,
-      registrationId: player.id,
-      name: player.name,
-      basePrice: 1000,
-      category: player.playerType ?? "All-Rounder",
-      status: "pending",
-      round: 1,
-    }));
-  if (teams.length < 2) throw new Error("Select at least two teams.");
-  if (players.length < 1) throw new Error("Select at least one player.");
+  const auctions = await readAll();
+  // Teams and players are no longer picked upfront — they self-register
+  // (players) or are added by the owner (teams) once the auction exists.
   const auction: Auction = {
-    id: nextId(auctions), name: input.name, ownerId: input.ownerId, ownerName: input.ownerName,
-    status: "setup", round: 1, initialPurse: input.purse, teams, players,
-    bidHistory: [], createdAt: new Date().toISOString(),
+    id: nextId(auctions),
+    name: input.name,
+    ownerId: input.ownerId,
+    ownerName: input.ownerName,
+    status: "setup",
+    round: 1,
+    initialPurse: input.purse,
+    defaultBasePrice: input.defaultBasePrice,
+    date: input.date,
+    time: input.time,
+    tournamentId: input.tournamentId,
+    venue: input.venue,
+    description: input.description,
+    teams: [],
+    players: [],
+    bidHistory: [],
+    createdAt: new Date().toISOString(),
   };
   auctions.push(auction);
+  await writeAll(auctions);
+  return auction;
+}
+
+function nextAuctionPlayerId(auction: Auction): string {
+  const max = auction.players.reduce((value, player) => {
+    const match = /^AP-(\d+)$/.exec(player.id);
+    return Math.max(value, match ? Number(match[1]) : 0);
+  }, 0);
+  return `AP-${String(max + 1).padStart(4, "0")}`;
+}
+
+export type AuctionMutationResult = Auction | "not-found" | "not-setup" | "already-registered" | "invalid";
+
+/** A registered player adds themselves to an auction's player pool. */
+export async function registerPlayerForAuction(
+  auctionId: string,
+  player: { id: string; name: string; playerType?: string },
+): Promise<AuctionMutationResult> {
+  const auctions = await readAll();
+  const auction = auctions.find((item) => item.id === auctionId);
+  if (!auction) return "not-found";
+  if (auction.status !== "setup") return "not-setup";
+  if (auction.players.some((item) => item.registrationId === player.id)) return "already-registered";
+  auction.players.push({
+    id: nextAuctionPlayerId(auction),
+    registrationId: player.id,
+    name: player.name,
+    basePrice: auction.defaultBasePrice,
+    category: player.playerType ?? "All-Rounder",
+    status: "pending",
+    round: 1,
+  });
+  await writeAll(auctions);
+  return auction;
+}
+
+/** Removes a self-registered player from the pool (only before the auction goes live). */
+export async function withdrawPlayerFromAuction(
+  auctionId: string,
+  registrationId: string,
+): Promise<AuctionMutationResult> {
+  const auctions = await readAll();
+  const auction = auctions.find((item) => item.id === auctionId);
+  if (!auction) return "not-found";
+  if (auction.status !== "setup") return "not-setup";
+  const before = auction.players.length;
+  auction.players = auction.players.filter((player) => player.registrationId !== registrationId);
+  if (auction.players.length === before) return "invalid";
+  await writeAll(auctions);
+  return auction;
+}
+
+/** Owner/admin adds a team to the auction (see isAuctionOwner for who may call this). */
+export async function registerTeamForAuction(
+  auctionId: string,
+  team: { id: string; name: string },
+): Promise<AuctionMutationResult> {
+  const auctions = await readAll();
+  const auction = auctions.find((item) => item.id === auctionId);
+  if (!auction) return "not-found";
+  if (auction.status !== "setup") return "not-setup";
+  if (auction.teams.some((item) => item.id === team.id)) return "already-registered";
+  auction.teams.push({
+    id: team.id,
+    name: team.name,
+    initialPurse: auction.initialPurse,
+    purse: auction.initialPurse,
+    players: [],
+  });
+  await writeAll(auctions);
+  return auction;
+}
+
+/** Owner/admin removes a team from the auction (only before it goes live). */
+export async function withdrawTeamFromAuction(
+  auctionId: string,
+  teamId: string,
+): Promise<AuctionMutationResult> {
+  const auctions = await readAll();
+  const auction = auctions.find((item) => item.id === auctionId);
+  if (!auction) return "not-found";
+  if (auction.status !== "setup") return "not-setup";
+  const before = auction.teams.length;
+  auction.teams = auction.teams.filter((team) => team.id !== teamId);
+  if (auction.teams.length === before) return "invalid";
   await writeAll(auctions);
   return auction;
 }
