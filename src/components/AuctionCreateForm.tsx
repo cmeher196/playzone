@@ -134,12 +134,12 @@ export function AuctionCreateForm({ tournaments }: { tournaments: TournamentOpti
               <input
                 type="number"
                 min={1}
-                step={1000}
+                step={1}
                 value={defaultBasePrice}
                 onChange={(event) => setDefaultBasePrice(event.target.value)}
                 className={`${input} mt-1.5`}
               />
-              <span className="mt-1 block text-xs font-normal text-white/40">Given to every player when they register.</span>
+              <span className="mt-1 block text-xs font-normal text-white/40">Given to every player when they register. Any amount.</span>
             </label>
           </div>
 

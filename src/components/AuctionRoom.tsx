@@ -24,6 +24,8 @@ export function AuctionRoom({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [teamToAdd, setTeamToAdd] = useState("");
+  const [showNewTeam, setShowNewTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
   const current = auction.players.find((player) => player.id === auction.currentPlayerId);
   const currentTeam = auction.teams.find((team) => team.id === auction.currentBidTeamId);
   const isSetup = auction.status === "setup";
@@ -50,6 +52,36 @@ export function AuctionRoom({
         return;
       }
       setAuction(data.auction);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createTeam() {
+    if (newTeamName.trim().length < 2) {
+      setError("Enter a team name.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // If the auction is dedicated to a tournament, the new team is
+      // created under it too, so it stays consistent with the eligible
+      // teams list; otherwise it's a standalone team.
+      const response = await fetch(
+        auction.tournamentId ? `/api/tournaments/${auction.tournamentId}/teams` : "/api/teams",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newTeamName.trim() }) },
+      );
+      const data = (await response.json()) as { error?: string; team?: { id: string } };
+      if (!response.ok || !data.team) {
+        setError(data.error ?? "Could not create the team.");
+        return;
+      }
+      setNewTeamName("");
+      setShowNewTeam(false);
+      await call("teams", { teamId: data.team.id });
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -145,26 +177,51 @@ export function AuctionRoom({
           )}
 
           {canControl && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-              <span className="text-sm font-medium text-white/70">🔒 Add a team:</span>
-              <select
-                value={teamToAdd}
-                onChange={(event) => setTeamToAdd(event.target.value)}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
-              >
-                <option value="" className="bg-[#0a1712]">Select a team…</option>
-                {availableTeamsToAdd.map((team) => (
-                  <option key={team.id} value={team.id} className="bg-[#0a1712]">
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-              <button disabled={busy || !teamToAdd} onClick={addTeam} className={`${button} bg-emerald-500 text-emerald-950`}>
-                + Add team
-              </button>
-              {availableTeamsToAdd.length === 0 && eligibleTeams.length === 0 && (
-                <span className="text-xs text-white/40">No eligible teams found.</span>
-              )}
+            <div className="space-y-3 border-t border-white/10 pt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-white/70">🔒 Add a team:</span>
+                <select
+                  value={teamToAdd}
+                  onChange={(event) => setTeamToAdd(event.target.value)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
+                >
+                  <option value="" className="bg-[#0a1712]">Select an existing team…</option>
+                  {availableTeamsToAdd.map((team) => (
+                    <option key={team.id} value={team.id} className="bg-[#0a1712]">
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                <button disabled={busy || !teamToAdd} onClick={addTeam} className={`${button} bg-emerald-500 text-emerald-950`}>
+                  + Add team
+                </button>
+                {availableTeamsToAdd.length === 0 && (
+                  <span className="text-xs text-white/40">No existing eligible teams left — create one instead.</span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewTeam(!showNewTeam)}
+                  className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20"
+                >
+                  + Create a new team
+                </button>
+                {showNewTeam && (
+                  <>
+                    <input
+                      value={newTeamName}
+                      onChange={(event) => setNewTeamName(event.target.value)}
+                      placeholder="New team name"
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-emerald-400/60"
+                    />
+                    <button disabled={busy} onClick={createTeam} className={`${button} bg-emerald-500 text-emerald-950`}>
+                      {busy ? "Creating…" : "Create & add"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
