@@ -207,9 +207,9 @@ Most authenticated pages use `DashboardShell`, which provides:
 5. If an entry fee applies, the player uses the configured UPI details and submits a UTR/reference value.
 6. The organizer creates teams and adds players.
 7. The organizer creates tournament-backed matches.
-8. The organizer selects two teams, overs, date, and venue. Neither the toss nor the playing XI/roles are decided at this point — both teams' full current rosters are attached to the match as-is, and many matches are scheduled ahead of when they'll actually start.
+8. The organizer selects two teams, overs, date, and venue. Neither the toss nor the playing XI/roles are decided at this point — both teams' full rosters are attached to the match as-is, and many matches are scheduled ahead of when they'll actually start.
 9. The match opens in scorer mode.
-10. Before any ball-by-ball events can be recorded: the scorer confirms each team's playing XI (exactly 11 of that team's full roster), optionally a 12th man, and that team's captain/vice-captain/wicketkeeper for this match, via `POST /api/matches/[matchId]/lineup` (once per team) — this narrows the team's roster on the match down to just the XI. The scorer also conducts the toss (toss-winning team and bat/bowl decision) via `POST /api/matches/[matchId]/toss`; this determines which side bats first in the first innings.
+10. Before any ball-by-ball events can be recorded: the scorer confirms each team's playing squad (at least 2 players, with no fixed 11-player requirement), optionally a 12th man, and that team's captain/vice-captain/wicketkeeper for this match, via `POST /api/matches/[matchId]/lineup` (once per team) — this narrows the team's roster on the match down to the selected playing squad. The scorer also conducts the toss (toss-winning team and bat/bowl decision) via `POST /api/matches/[matchId]/toss`; this determines which side bats first in the first innings.
 11. The scorer records ball-by-ball events.
 12. The system derives scores, wickets, overs, batsman cards, bowler cards, extras, commentary, and result data from the event log.
 13. The scorer completes the match.
@@ -281,7 +281,7 @@ The scoring engine uses immutable-style event replay semantics:
 - Delivery events are the source of truth.
 - Scoreboard values are computed from the event history.
 - Undo removes the latest event and recomputes the state.
-- Both teams' full rosters are attached at match creation; each team's playing XI (exactly 11), optional 12th man, captain, vice-captain, and wicketkeeper are confirmed once per team from the scorer screen before any delivery can be recorded (`POST /api/matches/[matchId]/lineup`) — this narrows that team's roster on the match down to just the XI, so only XI members are selectable as openers/bowlers/new batters for the rest of the match. Cannot be changed once confirmed.
+- Both teams' full rosters are attached at match creation; each team's playing squad (minimum 2 players), optional 12th man, captain, vice-captain, and wicketkeeper are confirmed once per team from the scorer screen before any delivery can be recorded (`POST /api/matches/[matchId]/lineup`) — this narrows that team's roster to the selected players, so only selected squad members are selectable as openers/bowlers/new batters for the rest of the match. The lineup can be larger or smaller than 11 and cannot be changed once confirmed.
 - The toss (winning team + bat/bowl decision) is optional at match creation and is instead decided once, from the scorer screen, before any delivery can be recorded — it determines which side bats first in the first innings and cannot be changed after the toss is set.
 - A match starts with the first innings.
 - Ending the first innings creates the second innings with batting and bowling sides swapped.

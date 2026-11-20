@@ -44,7 +44,7 @@ export async function POST(
   const parsed = matchLineupSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Please check the playing XI and roles." },
+      { error: parsed.error.issues[0]?.message ?? "Please check the playing squad and roles." },
       { status: 422 },
     );
   }
@@ -65,7 +65,10 @@ export async function POST(
     );
   }
   if (new Set(playingXI).size !== playingXI.length) {
-    return NextResponse.json({ error: "Playing XI has duplicate players." }, { status: 422 });
+    return NextResponse.json({ error: "Playing squad has duplicate players." }, { status: 422 });
+  }
+  if (playingXI.length > team.players.length) {
+    return NextResponse.json({ error: "Playing squad cannot contain more players than the team roster." }, { status: 422 });
   }
 
   const result = await setMatchLineup(matchId, teamId, {

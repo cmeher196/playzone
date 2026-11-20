@@ -14,8 +14,8 @@ const labelClass = "mb-1.5 block text-sm font-medium text-emerald-100/80";
 
 /**
  * Match creation only picks the two teams (using their full current
- * roster) and the match logistics. Playing XI, 12th man, captain,
- * vice-captain, and wicketkeeper are decided later, right before the match
+ * roster) and the match logistics. Playing squad (minimum 2 players), 12th man,
+ * captain, vice-captain, and wicketkeeper are decided later, right before the match
  * starts (see the lineup step in Scorer.tsx) — many matches are scheduled
  * well ahead of when that's actually known.
  */
@@ -107,7 +107,7 @@ export function MatchSetupWizard({
       // Standalone matches use the same real team/player ids as tournament
       // matches (just without a tournamentId) so completed standalone
       // matches still attribute performance to the real player accounts.
-      // The full roster is sent — playing XI is chosen later, at match start.
+      // The full roster is sent — the playing squad is chosen later, at match start.
       const response = await fetch(tournamentId ? `/api/tournaments/${tournamentId}/matches` : "/api/matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

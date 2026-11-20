@@ -287,7 +287,7 @@ export type MatchTossInput = z.infer<typeof matchTossSchema>;
 export const matchLineupSchema = z
   .object({
     teamId: z.string().min(1, "Team is required"),
-    playingXI: z.array(z.string().min(1)).length(11, "Select exactly 11 players"),
+    playingXI: z.array(z.string().min(1)).min(2, "Select at least 2 playing players"),
     twelfthManId: z.string().min(1).optional(),
     captainId: z.string().min(1, "Select a captain"),
     viceCaptainId: z.string().min(1, "Select a vice-captain"),

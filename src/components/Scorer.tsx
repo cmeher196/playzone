@@ -142,8 +142,12 @@ export function Scorer({
 
   async function confirmLineup() {
     if (!lineupTeam) return;
-    if (lineupXI.length !== 11) {
-      setError("Select exactly 11 players for the playing XI.");
+    if (lineupXI.length < 2) {
+      setError("Select at least 2 players for the playing squad.");
+      return;
+    }
+    if (lineupXI.length > lineupTeam.players.length) {
+      setError("Playing squad cannot contain more players than the team roster.");
       return;
     }
     if (!captainSel || !viceCaptainSel || !wicketkeeperSel) {
@@ -321,14 +325,13 @@ export function Scorer({
               </ConfirmButton>
             </Setup>
           ) : lineupTeamKey && lineupTeam ? (
-            <Setup title={`Confirm ${lineupTeam.name}'s playing XI`}>
+            <Setup title={`Confirm ${lineupTeam.name}'s playing squad`}>
               <p className="text-xs text-white/50">
-                Select exactly 11 players from the full squad ({lineupXI.length}/11 selected).
+                Select at least 2 players for this match ({lineupXI.length}/{lineupTeam.players.length} selected).
               </p>
               <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
                 {lineupTeam.players.map((p) => {
                   const checked = lineupXI.includes(p.playerId);
-                  const disabled = !checked && lineupXI.length >= 11;
                   return (
                     <label
                       key={p.playerId}
@@ -336,12 +339,11 @@ export function Scorer({
                         checked
                           ? "border-emerald-400 bg-emerald-400/10 text-emerald-100"
                           : "border-white/10 bg-white/5 text-white/70"
-                      } ${disabled ? "opacity-40" : ""}`}
+                      }`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={disabled}
                         onChange={() =>
                           setLineupXI((value) =>
                             checked ? value.filter((id) => id !== p.playerId) : [...value, p.playerId],
@@ -355,7 +357,7 @@ export function Scorer({
                 })}
               </div>
 
-              {lineupXI.length === 11 && (
+              {lineupXI.length >= 2 && (
                 <div>
                   <p className="mb-1.5 text-xs text-white/50">12th man (optional)</p>
                   <select className={selectClass} value={twelfthManSel} onChange={(e) => setTwelfthManSel(e.target.value)}>
@@ -371,7 +373,7 @@ export function Scorer({
                 </div>
               )}
 
-              {lineupXI.length === 11 && (
+              {lineupXI.length >= 2 && (
                 <div className="grid gap-2 sm:grid-cols-3">
                   {[
                     { label: "Captain", value: captainSel, setValue: setCaptainSel },
