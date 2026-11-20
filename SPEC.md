@@ -255,6 +255,10 @@ The page provides both:
 - A list of tournaments managed by the current user.
 - The same team setup wizard (`MatchSetupWizard`) used for tournament-backed matches, minus the tournament attachment — real registered teams are used (not free-text names), so completed standalone matches still attribute performance/stats correctly.
 
+The match setup wizard lets organizers add registered or newly created players inline after selecting or creating each team.
+
+After selecting or creating Team A, the setup wizard opens an inline roster step where the organizer can search and add registered players or create and add a new player. The organizer must add at least 2 players before continuing to Team B, then repeats the roster step for Team B. Existing team rosters can be updated during setup, and the entire selected roster is attached to the match.
+
 Endpoint: `POST /api/matches`. Like the tournament-backed flow, only the two teams (full roster) and match logistics are collected — no toss, playing XI, or roles.
 
 Standalone matches have no tournament ID and store the creating user as `ownerId`. They use the same `LiveMatch` structure and scorer as tournament-backed matches.
