@@ -739,7 +739,7 @@ function InfoPanel({ match, live }: { match: LiveMatch; live: ComputedMatch }) {
 }
 
 function InningsTables({ innings }: { innings: InningsState }) {
-  const batted = innings.batters.filter((b) => b.balls > 0 || b.out);
+  const batted = innings.batters.filter((b) => b.balls > 0 || b.out || b.retired);
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -760,7 +760,7 @@ function InningsTables({ innings }: { innings: InningsState }) {
               <tr key={b.playerId} className="border-t border-white/5 text-white/80">
                 <td className="py-1 pr-2 font-medium text-white">{b.name}</td>
                 <td className="py-1 pr-2 text-xs text-white/40">
-                  {b.out ? b.how : "not out"}
+                  {b.retired ? "retd ht" : b.out ? b.how : "not out"}
                 </td>
                 <td className="px-2 py-1 text-right font-semibold">{b.runs}</td>
                 <td className="px-2 py-1 text-right">{b.balls}</td>

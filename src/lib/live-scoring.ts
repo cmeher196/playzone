@@ -48,9 +48,15 @@ export interface OpenersEvent {
 export interface BowlerEvent {
   t: "bowler";
   bowlerId: string;
+  /** Keeps the current over's legal-ball count when replacing a bowler mid-over. */
+  midOver?: boolean;
 }
 export interface NewBatterEvent {
   t: "newBatter";
+  batterId: string;
+}
+export interface RetireBatterEvent {
+  t: "retireBatter";
   batterId: string;
 }
 export interface EndInningsEvent {
@@ -67,6 +73,7 @@ export type ScoreEvent =
   | OpenersEvent
   | BowlerEvent
   | NewBatterEvent
+  | RetireBatterEvent
   | EndInningsEvent
   | SwapStrikeEvent;
 
@@ -122,6 +129,7 @@ export interface BatterCard {
   fours: number;
   sixes: number;
   out: boolean;
+  retired?: boolean;
   how: string;
 }
 export interface BowlerCard {
@@ -239,7 +247,7 @@ export function reduceInnings(
   const ensureBat = (id: string): BatterCard => {
     let b = batters.get(id);
     if (!b) {
-      b = { playerId: id, name: nameOf(id), runs: 0, balls: 0, fours: 0, sixes: 0, out: false, how: "not out" };
+      b = { playerId: id, name: nameOf(id), runs: 0, balls: 0, fours: 0, sixes: 0, out: false, retired: false, how: "not out" };
       batters.set(id, b);
       order.push(id);
     }
@@ -300,15 +308,31 @@ export function reduceInnings(
       bowlerId = ev.bowlerId;
       ensureBowl(ev.bowlerId);
       needBowler = false;
-      ballsThisOver = 0;
-      overRunsBowler = 0;
-      thisOver = [];
-      thisOverRuns = 0;
+      if (!ev.midOver) {
+        ballsThisOver = 0;
+        overRunsBowler = 0;
+        thisOver = [];
+        thisOverRuns = 0;
+      }
     } else if (ev.t === "newBatter") {
-      ensureBat(ev.batterId);
+      const batter = ensureBat(ev.batterId);
+      if (batter.retired) {
+        batter.retired = false;
+        batter.how = "not out";
+      }
       if (!strikerId) strikerId = ev.batterId;
       else if (!nonStrikerId) nonStrikerId = ev.batterId;
       needBatter = false;
+    } else if (ev.t === "retireBatter") {
+      const batter = ensureBat(ev.batterId);
+      batter.out = false;
+      batter.retired = true;
+      batter.how = "retd ht";
+      if (strikerId === ev.batterId) strikerId = undefined;
+      else if (nonStrikerId === ev.batterId) nonStrikerId = undefined;
+      needBatter = true;
+      partRuns = 0;
+      partBalls = 0;
     } else if (ev.t === "swapStrike") {
       if (!closed && !needBatter && !needBowler) swap();
     } else if (ev.t === "endInnings") {

@@ -290,6 +290,8 @@ The scoring engine uses immutable-style event replay semantics:
 - A match starts with the first innings.
 - Ending the first innings creates the second innings with batting and bowling sides swapped.
 - A scheduled match becomes live after the first scoring event.
+- The scorer can mark either batter at the crease as `retd ht`; this does not count as an out dismissal. The batter remains available to return later, and a replacement batter is selected normally.
+- The scorer can change the bowler while an over is in progress. A mid-over change does not complete or reset the over: the replacement bowler starts with the over's existing legal-ball progress and bowls until six legal balls have been reached.
 - A match becomes complete only when the scoring engine reports it is ready.
 
 Supported event concepts include:
@@ -302,7 +304,9 @@ Supported event concepts include:
 - Wickets.
 - Opening batters.
 - New batter selection.
+- Retiring a batter hurt; the scorer can mark a batter `retd ht`, send a replacement batter in, and later select the retired-hurt batter again.
 - Bowler selection.
+- Mid-over bowler changes; selecting another bowler preserves the current over's legal-ball count and remaining balls, and the next bowler completes the over.
 - Innings end.
 
 The scoreboard exposes:

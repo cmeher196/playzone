@@ -29,10 +29,14 @@ export function Scorer({
   const [error, setError] = useState<string | null>(null);
   const [pendingExtra, setPendingExtra] = useState<ExtraType | null>(null);
   const [showWicket, setShowWicket] = useState(false);
+  const [showChangeBowler, setShowChangeBowler] = useState(false);
+  const [showRetireBatter, setShowRetireBatter] = useState(false);
 
   const [strikerSel, setStrikerSel] = useState("");
   const [nonStrikerSel, setNonStrikerSel] = useState("");
   const [bowlerSel, setBowlerSel] = useState("");
+  const [changeBowlerSel, setChangeBowlerSel] = useState("");
+  const [retireBatterSel, setRetireBatterSel] = useState("");
   const [batterSel, setBatterSel] = useState("");
   const [newBatterTakesStrike, setNewBatterTakesStrike] = useState(true);
   const [wType, setWType] = useState<WicketType>("bowled");
@@ -255,6 +259,25 @@ export function Scorer({
       } else {
         celebrate("wicket", "WICKET!");
       }
+    }
+  }
+
+  async function changeBowler() {
+    if (!changeBowlerSel || changeBowlerSel === cur!.bowlerId) return;
+    const ok = await postEvent({ t: "bowler", bowlerId: changeBowlerSel, midOver: true });
+    if (ok) {
+      setChangeBowlerSel("");
+      setShowChangeBowler(false);
+    }
+  }
+
+  async function retireBatter() {
+    const batterId = retireBatterSel || cur!.strikerId;
+    if (!batterId) return;
+    const ok = await postEvent({ t: "retireBatter", batterId });
+    if (ok) {
+      setRetireBatterSel("");
+      setShowRetireBatter(false);
     }
   }
 
@@ -582,6 +605,42 @@ export function Scorer({
                   🔁 Change strike
                 </button>
               </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button type="button" disabled={busy} onClick={() => setShowRetireBatter((value) => !value)} className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-200">
+                  🏏 Retire hurt
+                </button>
+                <button type="button" disabled={busy} onClick={() => setShowChangeBowler((value) => !value)} className="rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-sm font-semibold text-sky-200">
+                  🎯 Change bowler
+                </button>
+              </div>
+
+              {showRetireBatter && (
+                <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+                  <p className="mb-2 text-xs text-white/50">Choose the batter retiring hurt</p>
+                  <select className={selectClass} value={retireBatterSel} onChange={(e) => setRetireBatterSel(e.target.value)}>
+                    <option value="">Striker…</option>
+                    {crease.map((id) => {
+                      const batter = cur.batters.find((b) => b.playerId === id);
+                      return <option key={id} value={id} className="bg-[#0a1712]">{batter?.name ?? id}</option>;
+                    })}
+                  </select>
+                  <div className="mt-2"><ConfirmButton busy={busy} onClick={retireBatter}>Mark retired hurt</ConfirmButton></div>
+                </div>
+              )}
+
+              {showChangeBowler && (
+                <div className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-3">
+                  <p className="mb-2 text-xs text-white/50">Select the replacement; remaining balls complete this over</p>
+                  <select className={selectClass} value={changeBowlerSel} onChange={(e) => setChangeBowlerSel(e.target.value)}>
+                    <option value="">Bowler…</option>
+                    {bowling.filter((p) => p.playerId !== cur.bowlerId).map((p) => (
+                      <option key={p.playerId} value={p.playerId} className="bg-[#0a1712]">{p.name}</option>
+                    ))}
+                  </select>
+                  <div className="mt-2"><ConfirmButton busy={busy} onClick={changeBowler}>Change bowler</ConfirmButton></div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 {(["wide", "no-ball", "bye", "leg-bye"] as ExtraType[]).map((ex) => (
                   <button
