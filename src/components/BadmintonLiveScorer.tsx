@@ -348,7 +348,7 @@ export function BadmintonLiveScorer({
                       type="button"
                       disabled={busy}
                       onClick={() => sendPoint("playerA", pid)}
-                      className="w-full rounded-2xl bg-emerald-500 px-4 py-6 text-base font-bold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                      className="w-full rounded-2xl bg-orange-400 px-4 py-6 text-base font-bold text-orange-950 transition hover:bg-orange-300 disabled:opacity-50"
                     >
                       + Point
                       <span className="mt-1 block truncate text-sm font-medium opacity-80">{nameOf(pid)}</span>
@@ -376,7 +376,7 @@ export function BadmintonLiveScorer({
                   type="button"
                   disabled={busy}
                   onClick={() => sendPoint("playerA")}
-                  className="rounded-2xl bg-emerald-500 px-6 py-8 text-lg font-bold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                  className="rounded-2xl bg-orange-400 px-6 py-8 text-lg font-bold text-orange-950 transition hover:bg-orange-300 disabled:opacity-50"
                 >
                   + Point
                   <span className="mt-1 block truncate text-sm font-medium opacity-80">{teamA}</span>
