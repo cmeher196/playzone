@@ -31,6 +31,9 @@ export async function POST(
   }
 
   const updated = await undoLast(matchId);
+  if (updated === "conflict") {
+    return NextResponse.json({ error: "Score changed concurrently. Please retry." }, { status: 409 });
+  }
   if (!updated) {
     return NextResponse.json({ error: "Match not found." }, { status: 404 });
   }

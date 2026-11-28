@@ -10,7 +10,7 @@ import {
   type TeamLineup,
 } from "./live-scoring";
 import { addMatchToTournament, type Match } from "./tournaments";
-import { readStoredArray, writeStoredArray } from "./mongo";
+import { readStoredArray, readStoredItem, replaceStoredItemAtRevision, writeStoredArray } from "./mongo";
 import { isScorer, type Scorer } from "./scorers";
 
 async function readAll(): Promise<LiveMatch[]> {
@@ -36,8 +36,7 @@ export async function listAllLiveMatches(): Promise<LiveMatch[]> {
 }
 
 export async function getLiveMatch(id: string): Promise<LiveMatch | undefined> {
-  const items = await readAll();
-  return items.find((m) => m.id === id);
+  return readStoredItem<LiveMatch>("liveMatches", "live-matches.json", id);
 }
 
 export async function rescheduleLiveMatch(
@@ -96,6 +95,7 @@ export async function createLiveMatch(input: {
 
   const match: LiveMatch = {
     id: nextMatchId(items),
+    revision: 0,
     tournamentId: input.tournamentId,
     ownerId: input.ownerId,
     teamA: input.teamA,
@@ -254,56 +254,64 @@ export async function removeLiveMatchScorer(
 export async function applyEvent(
   id: string,
   event: ScoreEvent,
-): Promise<LiveMatch | undefined> {
-  const items = await readAll();
-  const index = items.findIndex((m) => m.id === id);
-  if (index === -1) return undefined;
-  const match = items[index];
-  if (match.status === "completed") return match;
+): Promise<LiveMatch | undefined | "conflict"> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const match = await getLiveMatch(id);
+    if (!match) return undefined;
+    if (match.status === "completed") return match;
+    const expectedRevision = match.revision ?? 0;
 
-  match.innings[match.currentInnings].events.push(event);
-  if (match.status === "scheduled") match.status = "live";
+    match.innings[match.currentInnings].events.push(event);
+    if (match.status === "scheduled") match.status = "live";
 
-  // First innings ended → open the second innings with sides swapped.
-  if (
-    event.t === "endInnings" &&
-    match.currentInnings === 0 &&
-    match.innings.length === 1
-  ) {
-    const first = match.innings[0];
-    match.innings.push({
-      battingTeam: first.bowlingTeam,
-      bowlingTeam: first.battingTeam,
-      events: [],
-    });
-    match.currentInnings = 1;
+    if (
+      event.t === "endInnings" &&
+      match.currentInnings === 0 &&
+      match.innings.length === 1
+    ) {
+      const first = match.innings[0];
+      match.innings.push({
+        battingTeam: first.bowlingTeam,
+        bowlingTeam: first.battingTeam,
+        events: [],
+      });
+      match.currentInnings = 1;
+    }
+
+    match.revision = expectedRevision + 1;
+    if (await replaceStoredItemAtRevision("liveMatches", "live-matches.json", match, expectedRevision)) {
+      return match;
+    }
   }
-
-  await writeAll(items);
-  return match;
+  return "conflict";
 }
 
-export async function undoLast(id: string): Promise<LiveMatch | undefined> {
-  const items = await readAll();
-  const index = items.findIndex((m) => m.id === id);
-  if (index === -1) return undefined;
-  const match = items[index];
+export async function undoLast(id: string): Promise<LiveMatch | undefined | "conflict"> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const match = await getLiveMatch(id);
+    if (!match) return undefined;
+    const expectedRevision = match.revision ?? 0;
+    const current = match.innings[match.currentInnings];
+    if (current.events.length > 0) {
+      current.events.pop();
+    } else if (match.currentInnings > 0) {
+      match.innings.pop();
+      match.currentInnings -= 1;
+      const prev = match.innings[match.currentInnings];
+      if (prev.events[prev.events.length - 1]?.t === "endInnings") prev.events.pop();
+    } else {
+      return match;
+    }
 
-  const current = match.innings[match.currentInnings];
-  if (current.events.length > 0) {
-    current.events.pop();
-  } else if (match.currentInnings > 0) {
-    match.innings.pop();
-    match.currentInnings -= 1;
-    const prev = match.innings[match.currentInnings];
-    if (prev.events[prev.events.length - 1]?.t === "endInnings") prev.events.pop();
+    if (match.status === "completed") match.status = "live";
+    match.result = undefined;
+    match.playerOfTheMatch = undefined;
+    match.revision = expectedRevision + 1;
+    if (await replaceStoredItemAtRevision("liveMatches", "live-matches.json", match, expectedRevision)) {
+      return match;
+    }
   }
-
-  if (match.status === "completed") match.status = "live";
-  match.result = undefined;
-  match.playerOfTheMatch = undefined;
-  await writeAll(items);
-  return match;
+  return "conflict";
 }
 
 export type CompleteResult =

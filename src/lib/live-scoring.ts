@@ -96,6 +96,7 @@ export interface TeamLineup {
 
 export interface LiveMatch {
   id: string;
+  revision?: number;
   tournamentId?: string;
   ownerId?: string;
   /** Users granted the Scorer role for this match (see `canScoreLiveMatch`). */

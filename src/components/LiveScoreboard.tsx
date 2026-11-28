@@ -95,7 +95,10 @@ export function LiveScoreboard({
 
   useEffect(() => {
     if (data.match.status === "completed") return;
+    let polling = false;
     const interval = setInterval(async () => {
+      if (polling) return;
+      polling = true;
       try {
         const res = await fetch(`/api/matches/${matchId}`, {
           cache: "no-store",
@@ -110,8 +113,10 @@ export function LiveScoreboard({
         setData(next);
       } catch {
         // transient network error — keep last known state
+      } finally {
+        polling = false;
       }
-    }, 5000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [matchId, data.match.status]);
 

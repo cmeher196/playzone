@@ -39,6 +39,47 @@ export async function readStoredArray<T>(
   }
 }
 
+export async function readStoredItem<T>(
+  collectionName: string,
+  fileName: string,
+  id: string,
+): Promise<T | undefined> {
+  if (mongoUri) {
+    const collection = await getCollection(collectionName);
+    const item = await collection.findOne({ id }, { projection: { _id: 0 } });
+    return (item ?? undefined) as T | undefined;
+  }
+
+  const items = await readStoredArray<T & { id?: string }>(collectionName, fileName);
+  return items.find((item) => item.id === id);
+}
+
+export async function replaceStoredItemAtRevision<T extends { id: string; revision?: number }>(
+  collectionName: string,
+  fileName: string,
+  item: T,
+  expectedRevision: number,
+): Promise<boolean> {
+  if (mongoUri) {
+    const collection = await getCollection(collectionName);
+    const revisionFilter = expectedRevision === 0
+      ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+      : { revision: expectedRevision };
+    const result = await collection.replaceOne(
+      { id: item.id, ...revisionFilter },
+      item as unknown as Document,
+    );
+    return result.matchedCount === 1;
+  }
+
+  const items = await readStoredArray<T & { id?: string }>(collectionName, fileName);
+  const index = items.findIndex((stored) => stored.id === item.id);
+  if (index === -1 || (items[index].revision ?? 0) !== expectedRevision) return false;
+  items[index] = item;
+  await writeStoredArray(collectionName, fileName, items);
+  return true;
+}
+
 export async function writeStoredArray<T>(
   collectionName: string,
   fileName: string,
